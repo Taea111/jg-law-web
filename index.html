@@ -197,6 +197,10 @@ button.filter-chip {padding:6px 14px;min-height:36px;font-size:14px;}
 .pick-names {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;}
 .workspace {display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:16px;align-items:start;}
 .workspace.list-only {grid-template-columns:minmax(0,1fr);}
+.case-find {display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:10px;}
+.case-find input {flex:1 1 180px;min-width:0;}
+.case-find .bar {display:inline-block;vertical-align:middle;}
+.case-snip {display:block;font-size:13px;color:var(--ink-muted);line-height:1.6;max-height:4.8em;overflow:hidden;}
 .workspace.list-only .reader {display:none;}
 .workspace.list-only .result-items {display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));align-content:start;max-height:none !important;}
 .workspace.list-only .result-items > .hint,.workspace.list-only .result-items > .type-chips,.workspace.list-only .result-items > .more {grid-column:1 / -1;}
@@ -219,6 +223,10 @@ button.filter-chip {padding:6px 14px;min-height:36px;font-size:14px;}
 .fav-btn {flex:none;border:0;background:none;color:var(--ink-muted);font-size:18px;line-height:1;padding:12px 4px 0;cursor:pointer;}
 .fav-btn.on {color:#d97706;}
 .fav-btn.fav-big {font-size:13px;padding:4px 10px;}
+.result-row > .fav-btn.fav-big {align-self:flex-start;margin-top:10px;border:1px solid var(--line);border-radius:999px;background:var(--surface-100);white-space:nowrap;}
+.result-row > .fav-btn.fav-big.on {border-color:#d97706;}
+.workspace:not(.list-only) .result-row > .fav-btn .fav-label {display:none;}
+.workspace:not(.list-only) .result-row > .fav-btn.fav-big {padding:4px 8px;}
 .list-wide {float:right;margin-top:-4px;}
 .deep-hint {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .law-ref {display:inline;border:0;background:none;padding:0;margin:0;font:inherit;line-height:inherit;color:var(--brand);text-decoration:underline;text-underline-offset:3px;cursor:pointer;text-align:left;}
@@ -482,7 +490,7 @@ kbd {font-family:var(--font-sans);font-size:12px;color:var(--ink-muted);border:1
   <form class="search-area" id="searchForm" role="search">
     <label class="vh" for="q">법령·사례 검색</label>
     <input id="q" type="search" autocomplete="off" maxlength="120" placeholder="법령 이름·낱말로 검색, 또는 질문을 쓰고 [Claude에게 묻기]" autofocus>
-    <button type="button" class="ghost save-search" id="saveBtn" aria-label="검색어 저장" title="검색어 저장 (Ctrl+S)" disabled>☆</button>
+    <button type="button" class="ghost save-search" id="saveBtn" aria-label="검색어 저장" title="검색어 저장 (Ctrl+S) — 법령 즐겨찾기는 결과·본문의 ☆" disabled>🔖</button>
     <button type="submit" class="primary">검색</button>
     <button type="button" class="secondary nb-open ai-only" id="askBtn" title="검색창의 질문을 Claude에게 (Ctrl+Enter)">🤖 Claude에게 묻기</button>
     <button type="button" class="secondary nb-open ai-only" id="nbBtn" title="체크한 법령으로 Claude에게 묻기 (Ctrl+B)">📓 노트북</button>
@@ -1361,7 +1369,7 @@ async function job(d) {
       for (const [h, t] of v.a) if (m(h + t)) { if (!hits) snip = h + " " + excerpt(t, d.q); hits++; }
       if (hits) out.push([mst, hits, snip]); }
   } else {
-    for (const id in shard) { const hit = shard[id].find((p) => m(p[1])); if (hit) out.push([id, hit[0] + ": " + excerpt(hit[1], d.q)]); }
+    for (const id of d.keys || Object.keys(shard)) { const v = shard[id]; const hit = v && v.find((p) => m(p[1])); if (hit) out.push([id, hit[0] + ": " + excerpt(hit[1], d.q)]); }
   }
   return {id: d.id, out};
 }
@@ -1422,6 +1430,7 @@ const S = {
   rightTab: "ask", notebook: null, lawFind: "", findIndex: 0, onlyMatches: true,
   saved: store.get("saved", []), region: {sido: "", sigungu: ""}, ordKind: "",
   prefs: store.get("prefs", {theme: "system", font: "normal"}), newPack: null,
+  caseQ: "", caseBody: null,
   favs: store.get("favs", []), sum: new Map(), listOnly: false, split: false, deep: false, deepRan: false,
 };
 const MAX_PICK = 6;
@@ -1501,7 +1510,7 @@ function renderNotice() {
 function renderSaved() {
   const el = $("#saved");
   el.hidden = !S.saved.length;
-  el.innerHTML = `<span class="saved-title">저장한 검색어</span><ul>${S.saved.map((s, i) => `<li>
+  el.innerHTML = `<span class="saved-title">🔖 저장한 검색어</span><ul>${S.saved.map((s, i) => `<li>
     <button type="button" class="saved-run" data-i="${i}">${esc(s.q)}${s.kind !== "all" ? `<small>${LABEL[s.kind] || ""}</small>` : ""}</button>
     <button type="button" class="saved-delete" data-del="${i}" aria-label="저장한 검색어 지우기: ${esc(s.q)}" title="지우기">×</button></li>`).join("")}</ul>
     <button type="button" class="ghost small" id="savedClear">모두 지우기</button>`;
@@ -1808,7 +1817,7 @@ function renderList() {
     return;
   }
   const hint = (S.results.some((r) => r.type === "law") && !S.selected.length && !S.picked.size
-    ? `<p class="hint">누르면 본문이 열리고, <b>두 번 누르면</b> 그 법령을 선택해 옆에 법령 비교가 뜹니다(법령 연계도도 그 법령으로). ☆는 즐겨찾기${PUBLIC ? "" : ", 왼쪽 ☐ 체크는 여러 법령 안에서 함께 찾기·📓 노트북"}입니다.</p>` : "")
+    ? `<p class="hint">누르면 본문이 열리고, <b>두 번 누르면</b> 그 법령을 선택해 옆에 법령 비교가 뜹니다(법령 연계도도 그 법령으로). <b>☆ 즐겨찾기</b>는 그 법령을 검색창 아래 ★ 줄에 남깁니다${PUBLIC ? "" : ", 왼쪽 ☐ 체크는 여러 법령 안에서 함께 찾기·📓 노트북"}입니다.</p>` : "")
     + ((S.kind === "all" || S.kind === "law") && !S.selected.length && !S.deepRan && compact(S.query).length >= 2
       ? `<p class="hint deep-hint">법령·자치법규 이름에서 찾았습니다. <button type="button" class="ghost small" id="deepBtn">📄 조문 내용에서도 ‘${esc(S.query)}’ 찾기</button></p>` : "");
   // Law types in the results (법률 · 시행령 · 시행규칙 …): counts that also filter the list.
@@ -1909,6 +1918,7 @@ $("#list").addEventListener("keydown", (e) => {
 /* ---------------------------------------------------------------- reader */
 async function openLaw(mst, focusTab = true) {
   S.chosen = {type: "law", id: mst, data: null}; S.detailTab = "content"; S.caseOpen = null; S.caseShown = {};
+  if (!S.chosen || S.caseLaw !== mst) { S.caseQ = ""; S.caseBody = null; S.caseLaw = mst; }
   // Found by its name: the whole law; found in its articles (or inside the chosen laws): those articles first.
   const item = S.results.find((r) => r.type === "law" && r.mst === mst);
   S.lawFind = item && (item.hits || S.selected.length) ? S.query : ""; S.findIndex = 0; S.onlyMatches = !!S.lawFind;
@@ -2061,10 +2071,16 @@ async function renderCasePanel() {
     return;
   }
   const total = ["prec", "expc", "decc"].reduce((a, k) => a + new Set((d.c[k] || []).map(([id]) => id)).size, 0);
+  const cq = compact(S.caseQ), word = S.caseQ || S.query;
+  const cb = S.caseBody && S.caseBody.key === mst + "|" + cq ? S.caseBody : null;
   box.innerHTML = `<div class="case-panel-head"><h3>이 법령의 사례 <span>${n(total)}</span></h3>
-    <p class="meta">${S.query ? `이 법령을 참조한 사례 · ‘${esc(S.query)}’가 들어간 것 먼저` : "이 법령을 참조한 판례, 법령명이 나오는 해석례·재결례"}</p></div>
+    <p class="meta">${S.query ? `이 법령을 참조한 사례 · ‘${esc(S.query)}’가 들어간 것 먼저` : "이 법령을 참조한 판례, 법령명이 나오는 해석례·재결례"}</p>
+    ${total ? `<div class="case-find"><label class="vh" for="caseFind">이 법령의 사례에서 찾기</label>
+      <input id="caseFind" type="search" maxlength="60" value="${esc(S.caseQ)}" placeholder="사례에서 찾기 (제목·본문, 예: 손해배상)">
+      <span class="meta" id="caseFindNote" aria-live="polite"></span></div>` : ""}</div>
     ${total ? `<p class="empty">사례 목록 불러오는 중…</p>` : `<p class="empty">받은 DB에 연결된 사례가 없습니다.</p>`}`;
   if (!total) return;
+  bindCaseFind(mst);
   const groups = [];
   for (const kind of ["prec", "expc", "decc"]) {
     const ids = d.c[kind] || [];
@@ -2072,21 +2088,93 @@ async function renderCasePanel() {
     await metaOf(kind);
     const qc = compact(S.query);
     const seen = new Set();
-    const rows = ids.filter(([id]) => !seen.has(id) && seen.add(id)).map(([id, why]) => ({id, why, r: S.metaById[kind].get(id)})).filter((x) => x.r);
+    let rows = ids.filter(([id]) => !seen.has(id) && seen.add(id)).map(([id, why]) => ({id, why, r: S.metaById[kind].get(id)})).filter((x) => x.r);
     rows.sort((a, b) => (qc && compact(b.r[1]).includes(qc)) - (qc && compact(a.r[1]).includes(qc)) || (b.r[3] || "").localeCompare(a.r[3] || ""));
-    groups.push({kind, rows});
+    if (cq) {
+      // 사례에서 찾기: the title, number or court first, then what the text search found.
+      const m = has(cq), body = cb && cb.hits[kind];
+      rows = rows.filter((x) => { x.snip = body && body.get(x.id); x.inTitle = m([x.r[1], x.r[2], x.r[3]].join(" ")); return x.inTitle || x.snip; })
+        .sort((a, b) => b.inTitle - a.inTitle);
+    }
+    groups.push({kind, rows, all: ids.length});
   }
   if (!S.chosen || S.chosen.id !== mst || S.caseOpen || !$("#casePanel")) return;
   const limit = (k) => S.caseShown[k] || 30;
   $("#casePanel").querySelectorAll(".empty").forEach((x) => x.remove());
-  $("#casePanel").insertAdjacentHTML("beforeend", groups.map((g) => `<section class="case-group"><h4>${LABEL[g.kind]} <span>${n(g.rows.length)}</span></h4>
-    ${g.rows.slice(0, limit(g.kind)).map((x) => `<button type="button" class="related" data-ck="${g.kind}" data-cid="${x.id}"><strong>${highlight(x.r[1], S.query)}</strong>
+  const found = groups.reduce((a, g) => a + g.rows.length, 0);
+  if (cq) {
+    const shards = caseShardJobs(d).length;
+    const note = $("#caseFindNote");
+    note.innerHTML = cb && !cb.finished ? `찾은 사례 ${n(found)} · 본문 찾는 중 <span class="bar"><i style="width:${Math.round(cb.done / Math.max(1, cb.total) * 100)}%"></i></span>`
+      : cb ? `찾은 사례 ${n(found)} (제목·본문)` : `제목에서 ${n(found)}건 <button type="button" class="ghost small" id="caseBodyBtn">📄 본문에서도 찾기</button>`;
+    if ($("#caseBodyBtn")) $("#caseBodyBtn").onclick = () => caseBodySearch(mst, S.caseQ, d);
+    if (!cb && cq.length >= 2 && shards <= 24) caseBodySearch(mst, S.caseQ, d);  // a few files: read at once
+  }
+  $("#casePanel").insertAdjacentHTML("beforeend", (cq && !found ? `<p class="empty">‘${esc(S.caseQ)}’가 든 사례가 ${cb && cb.finished ? "없습니다" : "제목에는 없습니다"}.</p>` : "") +
+    groups.filter((g) => g.rows.length).map((g) => `<section class="case-group"><h4>${LABEL[g.kind]} <span>${n(g.rows.length)}${cq ? ` / ${n(new Set((d.c[g.kind] || []).map(([id]) => id)).size)}` : ""}</span></h4>
+    ${g.rows.slice(0, limit(g.kind)).map((x) => `<button type="button" class="related" data-ck="${g.kind}" data-cid="${x.id}"><strong>${highlight(x.r[1], word)}</strong>
       <small>${g.kind === "prec" ? "이 법령을 참조한 판례" : x.why === "r" ? "이 법령을 참조한 자료" : "법령명이 나오는 자료"}${x.r[4] ? "" : " · 본문 없음(원문 링크)"}</small>
+      ${x.snip ? `<span class="case-snip">${highlight(x.snip, S.caseQ)}</span>` : ""}
       <span>${esc([x.r[2], x.r[3]].filter(Boolean).join(" · "))}</span></button>`).join("")}
     ${g.rows.length > limit(g.kind) ? `<button type="button" class="ghost small more" data-more="${g.kind}">더 보기 (${n(g.rows.length - limit(g.kind))})</button>` : ""}</section>`).join(""));
   $("#casePanel").querySelectorAll("[data-cid]").forEach((b) => b.onclick = () => { S.caseOpen = {kind: b.dataset.ck, id: b.dataset.cid}; S.casePanelScroll = $("#casePanel").scrollTop; renderCasePanel(); });
   $("#casePanel").querySelectorAll("[data-more]").forEach((b) => b.onclick = () => { S.caseShown[b.dataset.more] = limit(b.dataset.more) + 100; renderCasePanel(); });
   if (S.casePanelScroll) { $("#casePanel").scrollTop = S.casePanelScroll; S.casePanelScroll = 0; }
+}
+function bindCaseFind(mst) {
+  const f = $("#caseFind");
+  if (!f) return;
+  f.oninput = () => {
+    clearTimeout(S.caseFindT);
+    S.caseFindT = setTimeout(() => {
+      S.caseQ = f.value; S.caseShown = {};
+      const pos = f.selectionStart;
+      renderCasePanel().then(() => { const g = $("#caseFind"); if (g) { g.focus(); g.setSelectionRange(pos, pos); } });
+    }, 300);
+  };
+  f.onkeydown = (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); clearTimeout(S.caseFindT); S.caseQ = f.value; const d = S.chosen && S.chosen.data; if (d && compact(S.caseQ).length >= 1) caseBodySearch(mst, S.caseQ, d); } };
+}
+// The text files holding this law's cases (only the cases of this law are looked at in each).
+function caseShardJobs(d) {
+  const jobs = [];
+  for (const kind of ["prec", "expc", "decc"]) {
+    const shards = textShards(kind), byShard = new Map();
+    for (const [id] of d.c[kind] || []) {
+      const v = Number(id), sh = shards.find(([a, b]) => Number(a) <= v && v <= Number(b));
+      if (!sh) continue;
+      const l = byShard.get(sh[2]) || new Set(); l.add(id); byShard.set(sh[2], l);
+    }
+    for (const [name, ids] of byShard) jobs.push({kind, name, keys: [...ids]});
+  }
+  return jobs;
+}
+async function caseBodySearch(mst, q, d) {
+  const qc = compact(q);
+  if (!qc) return;
+  const key = mst + "|" + qc;
+  if (S.caseBody && S.caseBody.key === key) return;
+  const jobs = caseShardJobs(d), run = S.run;
+  const cb = S.caseBody = {key, hits: {prec: new Map(), expc: new Map(), decc: new Map()}, done: 0, total: jobs.length, finished: false};
+  const alive = () => S.caseBody === cb && S.chosen && S.chosen.id === mst;
+  let drawnAt = 0;
+  const progressNote = () => { const b = document.querySelector("#caseFindNote .bar i"); if (b) b.style.width = Math.round(cb.done / Math.max(1, cb.total) * 100) + "%";
+    if (performance.now() - drawnAt > 1500 && !S.caseOpen) { drawnAt = performance.now(); keepFocus(); } };
+  const keepFocus = () => { const f = $("#caseFind"), had = f && document.activeElement === f, pos = f ? f.selectionStart : 0;
+    renderCasePanel().then(() => { const g = $("#caseFind"); if (had && g) { g.focus(); g.setSelectionRange(pos, pos); } }); };
+  keepFocus();
+  const viaWorkers = await scanFiles("text", jobs.map((j) => ({name: j.name, keys: j.keys})), q, run,
+    (out, index) => { if (alive()) for (const [id, snip] of out) cb.hits[jobs[index].kind].set(id, snip); },
+    (done) => { if (alive()) { cb.done = done; progressNote(); } });
+  if (!viaWorkers) for (const j of jobs) {
+    if (!alive()) return;
+    const shard = await load(j.name), m = has(qc);
+    for (const id of j.keys) { const hit = (shard[id] || []).find((p) => m(p[1])); if (hit) cb.hits[j.kind].set(id, `${hit[0]}: ${excerpt(hit[1], q)}`); }
+    cb.done++; progressNote();
+    await tick();
+  }
+  if (!alive()) return;
+  cb.finished = true;
+  if (!S.caseOpen) keepFocus();
 }
 function closeCaseDoc() { const top = S.casePanelScroll; S.caseOpen = null; renderCasePanel().then(() => { if ($("#casePanel")) $("#casePanel").scrollTop = top || 0; }); S.casePanelScroll = top; }
 function partsHtml(parts, kind, id) {
@@ -2528,7 +2616,7 @@ function guideHtml() {
       <li>처음에는 <b>결과만 넓게</b> 보이고, 카드마다 그 법령의 목적(제1조) 같은 대략적인 내용이 나옵니다. 카드를 누르면 지금처럼 결과와 본문이 나란히 보이고, [⤢ 결과만 보기]로 다시 넓힙니다.</li>
       <li>조문 내용까지 찾으려면 결과 위 <b>[📄 조문 내용에서도 찾기]</b>를 누르세요. 이름에 맞는 법령이 없으면 조문 내용에서 바로 찾습니다. <span class="type-label">조문 10</span>은 검색어가 든 조문 수입니다.</li>
       <li>결과 위 종류 칩(법률·시행령·시행규칙·자치법규)을 누르면 그 종류만 봅니다.</li>
-      <li><b>☆</b>를 누르면 검색어가 저장되어 검색창 아래에 버튼으로 남습니다.</li></ul>`)}
+      <li>검색창 옆 <b>🔖</b>를 누르면 <b>검색어</b>가 저장되어 검색창 아래에 버튼으로 남습니다. <b>법령</b>을 즐겨찾기하려면 결과나 본문의 <b>☆ 즐겨찾기</b>를 누르세요(14번).</li></ul>`)}
     ${sec("3. 자료 종류와 법령 필터", `<ul><li><b>종류 탭</b>(전체 · 법령 · 판례 · 행정심판례 · 법령해석례 · 행정규칙 · 자치법규)으로 찾을 자료를 고릅니다. ‘전체’는 관련 법령을 보여 주고, 맞는 법령이 없으면 사례를 바로 보여 줍니다.</li>
       <li><b>법령 필터</b>: [+ 법령 추가]를 눌러 법령을 체크하고 <b>[확인]</b>을 누르면 <b>그 법령들 안에서만</b> 찾습니다(🔒 표시). Claude에게 묻기도 그 법령들 안에서만 찾습니다. 칩을 눌러 넣고 빼고, [전체 법령]을 누르면 풀립니다.</li>
       <li>자치법규 탭에서는 시·도와 시·군·구를 골라 그 지자체의 조례·규칙을 봅니다.</li></ul>`)}
@@ -2538,6 +2626,7 @@ function guideHtml() {
       <li><b>이 법령에서 찾기</b>(Ctrl+F): 다른 낱말로 바꿔 찾을 수 있고, ▲▼(또는 Enter / Shift+Enter)로 찾은 조문을 오가며, ‘찾은 조문만 보기’를 끄면 전체 조문이 보입니다.</li>
       <li>본문의 <b>「법령명」</b>(밑줄)을 누르면 그 법령이 창으로 뜹니다. 「법령명」 제34조처럼 조문이 붙어 있으면 그 조문으로 갑니다. 창 안에서 다른 「법령명」을 눌러 이어 보고, [← 이전 법령]으로 돌아옵니다.</li>
       <li>법령 오른쪽 <b>이 법령의 사례</b>: 이 법령을 참조한 판례, 법령명이 나오는 해석례·재결례입니다. 누르면 그 자리에서 본문이 열리고 [← 목록으로]로 돌아옵니다.</li>
+      <li><b>사례에서 찾기</b>: 사례 목록 위 칸에 낱말(예: 손해배상, 입찰)을 넣으면 그 법령의 사례 중 제목·사건번호에 든 것을 바로 거르고, 본문에 든 것도 찾아 해당 부분을 보여 줍니다. 사례가 아주 많은 법령은 [📄 본문에서도 찾기]를 누르거나 Enter를 누르면 본문을 찾습니다.</li>
       <li>‘본문 없음’ 표시가 있는 자료는 아직 목록만 받은 것입니다. [국가법령정보센터 원문 ↗]으로 원문을 볼 수 있습니다.</li>
       <li>‘출처와 날짜’ 탭에서 일련번호, 시행일, 자료 기준일, 원문 링크를 확인합니다.</li></ul>`)}
     ${sec("6. 🤖 Claude에게 묻기", `<p>처음 화면의 오른쪽 탭이나 검색창 옆 <b>[🤖 Claude에게 묻기]</b>(Ctrl+Enter)로 엽니다. Claude는 받은 DB를 먼저 찾아본 뒤 그 조문·사례를 근거로 답합니다.</p>
@@ -3623,8 +3712,9 @@ async function renderSideCmp() {
 function isFav(k, id) { return S.favs.some((f) => f.k === k && f.id === id); }
 function favBtn(k, id, i, big = false) {
   const on = isFav(k, id);
+  if (i != null) big = true;  // 결과 카드에도 글자를 붙여 검색어 저장(🔖)과 헷갈리지 않게
   return `<button type="button" class="fav-btn ${big ? "ghost small add-filter fav-big" : ""} ${on ? "on" : ""}" ${i != null ? `data-fav="${i}"` : `data-fk="${esc(k)}" data-fid="${esc(id)}"`}
-    aria-pressed="${on}" aria-label="즐겨찾기" title="${on ? "즐겨찾기에서 빼기" : "즐겨찾기에 넣기 (이 브라우저에 저장)"}">${on ? "★" : "☆"}${big ? " 즐겨찾기" : ""}</button>`;
+    aria-pressed="${on}" aria-label="즐겨찾기" title="${on ? "즐겨찾기에서 빼기" : "즐겨찾기에 넣기 (이 브라우저에 저장)"}">${on ? "★" : "☆"}${big ? '<span class="fav-label"> 즐겨찾기</span>' : ""}</button>`;
 }
 function bindFavBtns(root) {
   root.querySelectorAll("[data-fk]").forEach((b) => b.onclick = () => {
@@ -3642,7 +3732,7 @@ function toggleFav(k, id, title) {
     const bk = it ? (it.type === "law" ? "law" : it.kind) : b.dataset.fk, bid = it ? (it.type === "law" ? it.mst : it.id) : b.dataset.fid;
     if (bk !== k || bid !== id) return;
     const on = isFav(k, id), big = b.classList.contains("fav-big");
-    b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); b.textContent = (on ? "★" : "☆") + (big ? " 즐겨찾기" : "");
+    b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); b.innerHTML = (on ? "★" : "☆") + (big ? '<span class="fav-label"> 즐겨찾기</span>' : "");
     b.title = on ? "즐겨찾기에서 빼기" : "즐겨찾기에 넣기 (이 브라우저에 저장)";
   });
 }
@@ -3651,7 +3741,7 @@ function renderFavs() {
   if (!el) return;
   const list = S.favs.filter((f) => f.k !== "law" || !S.index || S.byMst.has(f.id));
   el.hidden = !list.length;
-  el.innerHTML = list.length ? `<span class="saved-title" title="이 브라우저에만 저장됩니다. 인터넷 사용 기록(쿠키·사이트 데이터)을 지우면 함께 지워집니다.">★ 즐겨찾기</span><ul>${list.map((f, i) => {
+  el.innerHTML = list.length ? `<span class="saved-title" title="이 브라우저에만 저장됩니다. 인터넷 사용 기록(쿠키·사이트 데이터)을 지우면 함께 지워집니다.">★ 즐겨찾기 법령</span><ul>${list.map((f, i) => {
     const L = f.k === "law" ? S.byMst.get(f.id) : null;
     return `<li><button type="button" class="saved-run" data-fo="${i}" title="${esc(L ? L.title : f.title)} (두 번 누르면 선택·옆에 비교)">${esc(L ? L.title : f.title)}<small>${esc(L ? lawType(L) : LABEL[f.k] || "")}</small></button>
       <button type="button" class="saved-delete" data-fd="${i}" aria-label="즐겨찾기에서 빼기: ${esc(f.title)}" title="빼기">×</button></li>`; }).join("")}</ul>` : "";
