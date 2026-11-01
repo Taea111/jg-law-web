@@ -196,6 +196,34 @@ button.filter-chip {padding:6px 14px;min-height:36px;font-size:14px;}
 .pick-bar {position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;margin:0 0 12px;border:1px solid var(--brand);border-radius:10px;background:var(--soft-brand);}
 .pick-names {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;}
 .workspace {display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:16px;align-items:start;}
+.workspace.list-only {grid-template-columns:minmax(0,1fr);}
+.workspace.list-only .reader {display:none;}
+.workspace.list-only .result-items {display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));align-content:start;max-height:none !important;}
+.workspace.list-only .result-items > .hint,.workspace.list-only .result-items > .type-chips,.workspace.list-only .result-items > .more {grid-column:1 / -1;}
+.workspace.list-only .summary {-webkit-line-clamp:3;}
+.workspace.split {grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
+.workspace.split .result-panel {display:none;}
+.workspace.split .law-layout {grid-template-columns:1fr;}
+.workspace.split .case-panel {border-left:0;border-top:1px solid var(--line);position:static !important;max-height:none !important;border-radius:0 0 12px 12px;}
+.side-cmp {padding:14px 16px;min-width:0;}
+.side-cmp-head {display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+.side-cmp-head h2 {font-size:17px;margin:0;}
+.side-cmp-btns {display:flex;gap:6px;flex-wrap:wrap;}
+.side-cmp-pick {display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0 8px;}
+.side-cmp-pick input {flex:1 1 200px;min-width:0;}
+.side-cmp-chips {display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.side-cmp-chips small {color:var(--ink-muted);font-size:11px;}
+.side-cmp .cmp-head {top:calc(var(--sticky-h) + 0px);}
+.summary {display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:13px;line-height:1.6;color:var(--ink-muted);}
+.summary:empty {display:none;}
+.fav-btn {flex:none;border:0;background:none;color:var(--ink-muted);font-size:18px;line-height:1;padding:12px 4px 0;cursor:pointer;}
+.fav-btn.on {color:#d97706;}
+.fav-btn.fav-big {font-size:13px;padding:4px 10px;}
+.list-wide {float:right;margin-top:-4px;}
+.deep-hint {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.law-ref {display:inline;border:0;background:none;padding:0;margin:0;font:inherit;line-height:inherit;color:var(--brand);text-decoration:underline;text-underline-offset:3px;cursor:pointer;text-align:left;}
+.law-ref:hover {background:color-mix(in srgb,var(--brand) 10%,transparent);}
+@media (max-width:810px) { .workspace.split {grid-template-columns:1fr;} }
 .panel {background:var(--surface-100);border:1px solid var(--line);border-radius:12px;min-width:0;}
 .result-panel {overflow:hidden;}
 .result-panel h2 {font-size:17px;font-weight:700;padding:16px 20px;margin:0;border-bottom:1px solid var(--line);}
@@ -289,6 +317,7 @@ body {padding-bottom:var(--dock-h);}
 .sticky-top {position:sticky;top:0;z-index:20;background:var(--surface-200);margin:0 -4px;padding:8px 4px 2px;}
 .sticky-top.stuck {box-shadow:0 6px 14px -10px #0006;border-bottom:1px solid var(--line);}
 .sticky-top.stuck .saved-searches {display:none;}
+.fav-bar .saved-title {color:#d97706;}
 .sticky-top.stuck .ext-notice {margin-top:8px;padding:5px 12px;}
 .sticky-top.stuck .ext-notice p {white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .sticky-top.stuck .data-notice {margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -444,7 +473,6 @@ kbd {font-family:var(--font-sans);font-size:12px;color:var(--ink-muted);border:1
   <button type="button" role="tab" data-page="search" aria-selected="true" id="pageSearchTab">🔎 법령 검색 · Claude에게 묻기</button>
   <button type="button" role="tab" data-page="graph" aria-selected="false">🕸 법령 연계도</button>
   <button type="button" role="tab" data-page="compare" aria-selected="false">📑 법령 비교</button>
-  <button type="button" role="tab" data-page="conflict" aria-selected="false">⚖ 충돌·중복 분석</button>
 </div></nav>
 <main class="main-wrap">
   <h1 class="vh">JG법령검색</h1>
@@ -460,6 +488,7 @@ kbd {font-family:var(--font-sans);font-size:12px;color:var(--ink-muted);border:1
     <button type="button" class="secondary nb-open ai-only" id="nbBtn" title="체크한 법령으로 Claude에게 묻기 (Ctrl+B)">📓 노트북</button>
   </form>
   <section class="saved-searches" id="saved" aria-label="저장한 검색어" hidden></section>
+  <section class="saved-searches fav-bar" id="favs" aria-label="즐겨찾기" hidden></section>
   <aside class="ext-notice" aria-label="알림">
     <strong>알림</strong>
     <p>이 페이지의 법령·판례·해석례·재결례·행정규칙·자치법규는 <b>국가법령정보센터</b> OPEN API에서 받은 자료입니다.
@@ -478,6 +507,7 @@ kbd {font-family:var(--font-sans);font-size:12px;color:var(--ink-muted);border:1
       <div class="result-items" id="list"></div>
     </section>
     <section class="panel reader" id="reader" aria-label="선택한 자료"></section>
+    <section class="panel side-cmp" id="sideCmp" aria-label="옆에 띄운 법령 비교" hidden></section>
   </div>
   </div>
   <section id="pageGraph" aria-label="법령 연계도" hidden>
@@ -1392,6 +1422,7 @@ const S = {
   rightTab: "ask", notebook: null, lawFind: "", findIndex: 0, onlyMatches: true,
   saved: store.get("saved", []), region: {sido: "", sigungu: ""}, ordKind: "",
   prefs: store.get("prefs", {theme: "system", font: "normal"}), newPack: null,
+  favs: store.get("favs", []), sum: new Map(), listOnly: false, split: false, deep: false, deepRan: false,
 };
 const MAX_PICK = 6;
 
@@ -1428,7 +1459,7 @@ async function boot() {
     }, () => {});
   }
   // The word index (needed by the first search) loads while the page sits idle.
-  (window.requestIdleCallback || ((f) => setTimeout(f, 800)))(() => { wordIndex(); scanPool(); loadLibrary(); });
+  (window.requestIdleCallback || ((f) => setTimeout(f, 800)))(() => { wordIndex(); scanPool(); });
   [user, assets] = await Promise.all([use("user"), use("assets")]);
   const canEdit = user ? await user.canEdit().catch(() => false) : false;
   if (canEdit && assets) { $("#updBtn").hidden = false; }
@@ -1448,14 +1479,14 @@ async function loadIndex() {
   renderAll();
 }
 async function switchPack(next) {
-  source.pack = next; cache.clear(); dropWorkerFiles(); S.meta = {}; S.metaById = {}; S.newPack = null;
+  source.pack = next; cache.clear(); dropWorkerFiles(); S.meta = {}; S.metaById = {}; S.newPack = null; S.sum = new Map();
   S.chosen = null; S.notebook = null;
   await loadIndex();
   if (S.query || S.selected.length || S.kind === "ordin") runSearch();
 }
 
 /* ---------------------------------------------------------------- top area */
-function renderAll() { renderSaved(); renderNotice(); renderKinds(); renderFilterBar(); renderPickBar(); renderList(); renderReader(); }
+function renderAll() { renderSaved(); renderFavs(); renderNotice(); renderKinds(); renderFilterBar(); renderPickBar(); renderList(); renderReader(); }
 function renderNotice() {
   const el = $("#notice");
   if (S.newPack) {
@@ -1589,7 +1620,7 @@ $("#q").addEventListener("input", () => { $("#saveBtn").disabled = !$("#q").valu
 $("#saveBtn").onclick = saveSearch;
 $("#askBtn").onclick = () => askClaude($("#q").value.trim());
 $("#q").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !PUBLIC) { e.preventDefault(); askClaude($("#q").value.trim()); } });
-function search(q) { S.typeFilter = ""; S.backTo = null; S.rightTab = "doc"; S.query = q; S.lawFind = q; S.findIndex = 0; S.onlyMatches = true; $("#saveBtn").disabled = !q; runSearch(); }
+function search(q) { S.typeFilter = ""; S.backTo = null; S.rightTab = "doc"; S.deep = false; S.listOnly = !!q; S.split = false; S.query = q; S.lawFind = q; S.findIndex = 0; S.onlyMatches = true; $("#saveBtn").disabled = !q; runSearch(); }
 async function metaOf(kind) {
   if (!S.meta[kind]) {
     const file = kind === "ordin" ? S.index.ordinances.meta : S.index.meta[kind];
@@ -1630,12 +1661,28 @@ async function runSearch() {
   }
   if (!qc) { renderList(); renderReader(); return; }
   if (S.kind === "all" || S.kind === "law") {
-    const title = S.laws.filter((L) => compact(L.title).includes(qc));
-    const found = new Map(title.map((L) => [L.mst, {hits: 0, snip: ""}]));
-    const show = () => { S.results = rankLaws(q, [...found.keys()].map((m) => Object.assign(S.byMst.get(m), {hits: found.get(m).hits})))
-      .map((L) => lawItem(L, found.get(L.mst).hits, found.get(L.mst).snip)); renderList(); };
+    // Names first: the laws with every word of the query in their name (with their whole 법률·시행령·
+    // 시행규칙 family) and, under 전체, the 자치법규 whose name or 지자체 has the words. The article
+    // texts are read only when no law name matches or on [조문 내용에서도 찾기].
+    const words = q.split(/\s+/).map(compact).filter(Boolean);
+    const named = (s) => { const c = compact(s); return words.every((w) => c.includes(w)); };
+    const fams = new Set(S.laws.filter((L) => named(L.title)).map((L) => L.family));
+    const found = new Map(S.laws.filter((L) => fams.has(L.family)).map((L) => [L.mst, {hits: 0, snip: ""}]));
+    let ords = [], placeFirst = false;
+    if (S.kind === "all" && S.index.ordinances && S.index.ordinances.listed) {
+      const rows = await metaOf("ordin");
+      if (stale()) return;
+      ords = rows.filter((r) => named(`${r[1]} ${r[2] || ""} ${r[3] || ""} ${r[4] || ""}`)).map(ordinItem);
+      const places = new Set();
+      for (const r of rows) { if (r[3]) places.add(compact(r[3])); if (r[4]) places.add(compact(r[4])); }
+      placeFirst = words.some((w) => places.has(w) || ["시", "군", "구", "도"].some((x) => places.has(w + x)));  // 태안군 주민자치회
+    }
+    const show = () => { const laws = rankLaws(q, [...found.keys()].map((m) => Object.assign(S.byMst.get(m), {hits: found.get(m).hits})))
+      .map((L) => lawItem(L, found.get(L.mst).hits, found.get(L.mst).snip));
+      S.results = placeFirst ? [...ords, ...laws] : [...laws, ...ords]; renderList(); };
+    S.deepRan = S.deep || !found.size;
     show();
-    if (qc.length >= 2) {
+    if (S.deepRan && qc.length >= 2) {
       const cand = await candidateMsts(q);
       if (stale()) return;
       const shards = [...new Set(S.laws.filter((L) => !cand || cand.has(L.mst)).map((L) => L.shard))];
@@ -1676,7 +1723,10 @@ async function runSearch() {
       }
       renderList();
     }
-    finish(S.results.length ? `${S.kind === "all" ? "관련 법령" : "법령"} ${n(S.results.length)}건` : "");
+    const lawN = S.results.filter((r) => r.type === "law").length, ordN = S.results.filter((r) => r.kind === "ordin").length;
+    finish(S.results.length ? [lawN && `${S.kind === "all" ? "관련 법령" : "법령"} ${n(lawN)}건`, ordN && `자치법규 ${n(ordN)}건`,
+      S.results.length > lawN + ordN && `사례 ${n(S.results.length - lawN - ordN)}건`].filter(Boolean).join(" · ") : "");
+    renderList();
     autoOpen();
     return;
   }
@@ -1727,11 +1777,13 @@ async function searchOrdinances(run) {
   const qc = compact(S.query);
   S.results = rows.filter((r) => r[3] === S.region.sido && (!S.region.sigungu ? !r[4] : r[4] === S.region.sigungu)
     && (!S.ordKind || r[5] === S.ordKind) && (!qc || compact(r[1]).includes(qc)))
-    .map((r) => ({type: "case", kind: "ordin", id: r[0], row: r, snip: `${r[2]} · ${r[5]}${r[6] ? " · 시행 " + r[6] : ""}`}));
+    .map(ordinItem);
   renderList();
 }
+function ordinItem(r) { return {type: "case", kind: "ordin", id: r[0], row: r, snip: `${r[2]} · ${r[5]}${r[6] ? " · 시행 " + r[6] : ""}`}; }
 function autoOpen() {
-  // The first law opens at once, like the program; the notebook stays in its tab.
+  // After a search only the results show (with a short summary); a click opens one beside them.
+  if (S.listOnly) { renderReader(); return; }
   const first = S.results[0];
   if (first && (!S.chosen || !S.results.some((r) => r.type === S.chosen.type && (r.mst || r.id) === S.chosen.id))) {
     if (first.type === "law") openLaw(first.mst, false); else openCase(first.kind, first.id, false);
@@ -1741,24 +1793,32 @@ function autoOpen() {
 /* ---------------------------------------------------------------- result list */
 function renderList() {
   const list = $("#list");
-  const title = S.selected.length ? "선택한 법령" : S.results.length && S.results[0].type === "law" ? (S.kind === "all" ? "관련 법령" : "법령") : "결과";
-  $("#listTitle").innerHTML = `${title} <span>${S.results.length ? n(S.results.length) : ""}</span>`;
+  queueMicrotask(renderLayout);
+  const mixed = S.results.some((r) => r.type === "law") && S.results.some((r) => r.kind === "ordin");
+  const title = S.selected.length ? "선택한 법령" : mixed ? "관련 법령·자치법규" : S.results.length && S.results[0].type === "law" ? (S.kind === "all" ? "관련 법령" : "법령") : "결과";
+  $("#listTitle").innerHTML = `${title} <span>${S.results.length ? n(S.results.length) : ""}</span>
+    ${S.results.length && !S.listOnly && S.chosen ? `<button type="button" class="ghost small list-wide" id="listWide" title="본문을 닫고 결과만 넓게 보기">⤢ 결과만 보기</button>` : ""}
+    ${S.listOnly && !PUBLIC && S.results.length ? `<button type="button" class="ghost small list-wide" id="listAi">🤖 Claude · AI 요약 열기</button>` : ""}`;
+  if ($("#listAi")) $("#listAi").onclick = () => { S.listOnly = false; S.rightTab = S.query ? "ai" : "ask"; renderList(); renderReader(); };
+  if ($("#listWide")) $("#listWide").onclick = () => { S.listOnly = true; S.rightTab = "doc"; renderList(); renderReader(); };
   if (!S.results.length) {
     list.innerHTML = `<p class="empty">${!S.index ? "자료 불러오는 중…" : S.kind === "ordin" && !S.selected.length ? "위에서 지자체를 고르세요."
       : S.query || S.selected.length ? (S.loading ? "찾는 중…" : "찾은 자료가 없습니다. 낱말이나 종류를 바꿔 보세요.")
       : "검색어를 넣으면 법령 이름과 조문에서 찾습니다.<br>법령을 고르면 조문과 그 법령의 판례·해석례가 함께 보입니다."}</p>`;
     return;
   }
-  const hint = S.results.some((r) => r.type === "law") && !S.selected.length && !S.picked.size
-    ? `<p class="hint">왼쪽 ☐를 체크하면 여러 법령 안에서 함께 찾고, 📓 노트북으로 Claude에게 물을 수 있습니다.</p>` : "";
+  const hint = (S.results.some((r) => r.type === "law") && !S.selected.length && !S.picked.size
+    ? `<p class="hint">누르면 본문이 열리고, <b>두 번 누르면</b> 그 법령을 선택해 옆에 법령 비교가 뜹니다(법령 연계도도 그 법령으로). ☆는 즐겨찾기${PUBLIC ? "" : ", 왼쪽 ☐ 체크는 여러 법령 안에서 함께 찾기·📓 노트북"}입니다.</p>` : "")
+    + ((S.kind === "all" || S.kind === "law") && !S.selected.length && !S.deepRan && compact(S.query).length >= 2
+      ? `<p class="hint deep-hint">법령·자치법규 이름에서 찾았습니다. <button type="button" class="ghost small" id="deepBtn">📄 조문 내용에서도 ‘${esc(S.query)}’ 찾기</button></p>` : "");
   // Law types in the results (법률 · 시행령 · 시행규칙 …): counts that also filter the list.
   const typeCount = {};
-  for (const it of S.results) if (it.type === "law") { const k = lawType(it.L); typeCount[k] = (typeCount[k] || 0) + 1; }
-  const types = TYPE_ORDER.filter((k) => typeCount[k]);
+  for (const it of S.results) { const k = itemType(it); if (k) typeCount[k] = (typeCount[k] || 0) + 1; }
+  const types = [...TYPE_ORDER, "자치법규"].filter((k) => typeCount[k]);
   if (S.typeFilter && !typeCount[S.typeFilter]) S.typeFilter = "";
-  const chips = types.length > 1 ? `<div class="type-chips" role="group" aria-label="법령 종류로 거르기">${types.map((k) =>
+  const chips = types.length > 1 ? `<div class="type-chips" role="group" aria-label="종류로 거르기">${types.map((k) =>
     `<button type="button" data-tf="${k}" aria-pressed="${S.typeFilter === k}">${typeBadge(k)}<b>${n(typeCount[k])}</b></button>`).join("")}</div>` : "";
-  const pool = S.typeFilter ? S.results.filter((it) => it.type !== "law" || lawType(it.L) === S.typeFilter) : S.results;
+  const pool = resultPool();
   const items = pool.slice(0, S.shown);
   list.innerHTML = chips + hint + items.map((it, i) => {
     const active = S.chosen && S.chosen.id === (it.mst || it.id) && S.chosen.type === it.type;
@@ -1769,8 +1829,10 @@ function renderList() {
         <button type="button" class="result ${typeClass(lawType(L))} ${active ? "active" : ""}" data-i="${i}" tabindex="${active || (!S.chosen && i === 0) ? 0 : -1}">
           <span class="result-top">${typeBadge(lawType(L), L.kind)}${L.local >= 40 ? '<span class="type-label local-badge">지자체</span>' : ""}${it.hits ? `<span class="type-label">조문 ${n(it.hits)}</span>` : ""}</span>
           <strong>${highlight(L.title, S.query)}</strong>
-          <span class="snippet">${it.snip ? highlight(it.snip, S.query) : esc(`${L.ministry} · 시행 ${L.effective || "-"} · 조문 ${n(L.articles)}`)}</span>
-          <span class="source-label">${esc(L.ministry)} · 판례 ${n(L.cases[0])} · 해석례 ${n(L.cases[1])} · 재결 ${n(L.cases[2])}</span></button></div>`;
+          ${it.snip ? `<span class="snippet">${highlight(it.snip, S.query)}</span>` : ""}
+          <span class="summary" data-sum="${L.mst}">${esc(S.sum.get(L.mst) || "")}</span>
+          <span class="source-label">${esc(L.ministry)} · 시행 ${esc(L.effective || "-")} · 조문 ${n(L.articles)} · 판례 ${n(L.cases[0])} · 해석례 ${n(L.cases[1])} · 재결 ${n(L.cases[2])}</span></button>
+        ${favBtn("law", L.mst, i)}</div>`;
     }
     const r = it.row;
     const info = it.kind === "ordin" ? "" : `${r[2]}${r[3] ? " · " + r[3] : ""}`;
@@ -1778,18 +1840,59 @@ function renderList() {
     return `<div class="result-row"><button type="button" class="result ${typeClass(LABEL[it.kind])} ${active ? "active" : ""}" data-i="${i}" tabindex="${active || (!S.chosen && i === 0) ? 0 : -1}">
       <span class="result-top">${typeBadge(LABEL[it.kind])}${has ? "" : '<span class="type-label">본문 없음</span>'}</span>
       <strong>${highlight(r[1], S.query)}</strong>
-      ${it.snip && it.snip !== r[2] ? `<span class="snippet">${highlight(it.snip, S.query)}</span>` : ""}
-      <span class="source-label">${esc(it.kind === "ordin" ? it.snip : info)}</span></button></div>`;
+      ${it.snip && it.snip !== r[2] && it.kind !== "ordin" ? `<span class="snippet">${highlight(it.snip, S.query)}</span>` : ""}
+      ${it.kind === "ordin" ? `<span class="summary" data-sum="o${esc(it.id)}">${esc(S.sum.get("o" + it.id) || "")}</span>` : ""}
+      <span class="source-label">${esc(it.kind === "ordin" ? it.snip : info)}</span></button>${favBtn(it.kind, it.id, i)}</div>`;
   }).join("") + (pool.length > S.shown ? `<button type="button" class="ghost small more" id="moreBtn">더 보기 (${n(pool.length - S.shown)})</button>` : "");
   list.querySelectorAll("[data-tf]").forEach((b) => b.onclick = () => { S.typeFilter = S.typeFilter === b.dataset.tf ? "" : b.dataset.tf; renderList(); });
-  list.querySelectorAll(".result").forEach((b) => b.onclick = (e) => {
-    const it = pool[+b.dataset.i];
-    if ((e.ctrlKey || e.metaKey) && it.type === "law") return tickLaw(it.mst);
-    S.rightTab = "doc";
-    if (it.type === "law") openLaw(it.mst); else openCase(it.kind, it.id);
+  list.querySelectorAll(".result").forEach((b) => {
+    b.onclick = (e) => {
+      const it = pool[+b.dataset.i];
+      if ((e.ctrlKey || e.metaKey) && it.type === "law") return tickLaw(it.mst);
+      S.rightTab = "doc";
+      if (it.type !== "law") return openCase(it.kind, it.id);
+      // A law opens a moment later, so that a second click (double click = 선택) finds the list unchanged.
+      clearTimeout(S.clickTimer);
+      if (e.detail >= 2) return selectLaw(it.mst);
+      S.clickTimer = setTimeout(() => { if (!(S.split && S.chosen && S.chosen.id === it.mst)) openLaw(it.mst); }, 240);
+    };
+    b.ondblclick = (e) => { const it = pool[+b.dataset.i]; if (it.type === "law" && !(S.split && CMP.a === it.mst)) { clearTimeout(S.clickTimer); selectLaw(it.mst); } };
   });
+  list.querySelectorAll("[data-fav]").forEach((b) => b.onclick = () => { const it = pool[+b.dataset.fav];
+    toggleFav(it.type === "law" ? "law" : it.kind, it.type === "law" ? it.mst : it.id, it.type === "law" ? it.L.title : it.row[1]); });
   list.querySelectorAll("[data-tick]").forEach((c) => c.onchange = () => tickLaw(c.dataset.tick));
   if ($("#moreBtn")) $("#moreBtn").onclick = () => { S.shown += 100; renderList(); };
+  if ($("#deepBtn")) $("#deepBtn").onclick = () => { S.deep = true; runSearch(); };
+  fillSummaries(items);
+}
+function itemType(it) { return it.type === "law" ? lawType(it.L) : it.kind === "ordin" ? "자치법규" : ""; }
+function resultPool() { return S.typeFilter ? S.results.filter((it) => { const k = itemType(it); return k === S.typeFilter || (!k && S.typeFilter !== "자치법규"); }) : S.results; }
+// The rough content of a result (제1조 목적), read in the background for the results on screen.
+function purposeOf(arts) {
+  const a = (arts || []).find(([h]) => /목적/.test(h || "")) || (arts || []).find(([h, t]) => !/^(제\d+(장|절|편)|부칙)/.test(h || "") && cleanArticle(h, t));
+  return a ? `${a[0] || ""} ${cleanArticle(a[0], a[1]) || ""}`.replace(/\s+/g, " ").trim().slice(0, 220) : "";
+}
+async function fillSummaries(items) {
+  const run = (S.sumRun = (S.sumRun || 0) + 1);
+  for (const it of items.slice(0, 40)) {
+    const key = it.type === "law" ? it.mst : it.kind === "ordin" ? "o" + it.id : null;
+    if (!key || S.sum.has(key)) continue;
+    if (it.kind === "ordin" && !it.row[7]) { S.sum.set(key, ""); continue; }
+    let text = "";
+    try { text = purposeOf(it.type === "law" ? (await lawData(it.mst)).a : await caseParts("ordin", it.id)); } catch (e) { /* keep the list as it is */ }
+    if (run !== S.sumRun) return;
+    S.sum.set(key, text);
+    const el = $("#list").querySelector(`[data-sum="${CSS.escape(key)}"]`);
+    if (el) el.textContent = text;
+  }
+}
+// 결과만 넓게 (after a search) · 결과와 본문 · 본문과 옆의 법령 비교 (a law chosen by double-click).
+function renderLayout() {
+  const ws = $(".workspace");
+  if (S.split && !(S.chosen && S.chosen.type === "law")) S.split = false;
+  ws.classList.toggle("list-only", S.listOnly && !S.split && S.rightTab === "doc");
+  ws.classList.toggle("split", !!S.split);
+  $("#sideCmp").hidden = !S.split;
 }
 $("#list").addEventListener("keydown", (e) => {
   const buttons = [...$("#list").querySelectorAll(".result")];
@@ -1800,14 +1903,17 @@ $("#list").addEventListener("keydown", (e) => {
   else if (e.key === "ArrowUp") { e.preventDefault(); go(at - 1); }
   else if (e.key === "Home") { e.preventDefault(); go(0); }
   else if (e.key === "End") { e.preventDefault(); go(buttons.length - 1); }
-  else if (e.key === " ") { const pool = S.typeFilter ? S.results.filter((r) => r.type !== "law" || lawType(r.L) === S.typeFilter) : S.results; const it = pool[+document.activeElement.dataset.i]; if (it.type === "law") { e.preventDefault(); tickLaw(it.mst); go(at); } }
+  else if (e.key === " ") { const pool = resultPool(); const it = pool[+document.activeElement.dataset.i]; if (it.type === "law") { e.preventDefault(); tickLaw(it.mst); go(at); } }
 });
 
 /* ---------------------------------------------------------------- reader */
 async function openLaw(mst, focusTab = true) {
   S.chosen = {type: "law", id: mst, data: null}; S.detailTab = "content"; S.caseOpen = null; S.caseShown = {};
-  S.lawFind = S.query; S.findIndex = 0; S.onlyMatches = !!S.query;
-  if (focusTab) S.rightTab = "doc";
+  // Found by its name: the whole law; found in its articles (or inside the chosen laws): those articles first.
+  const item = S.results.find((r) => r.type === "law" && r.mst === mst);
+  S.lawFind = item && (item.hits || S.selected.length) ? S.query : ""; S.findIndex = 0; S.onlyMatches = !!S.lawFind;
+  if (focusTab) { S.rightTab = "doc"; S.listOnly = false; }
+  if (S.split && CMP.a !== mst) { CMP.a = mst; CMP.b = familyPartner(S.byMst.get(mst)); queueMicrotask(renderSideCmp); }
   renderList(); renderReader();
   const d = await lawData(mst);
   if (!S.chosen || S.chosen.id !== mst) return;
@@ -1816,7 +1922,7 @@ async function openLaw(mst, focusTab = true) {
 }
 async function openCase(kind, id, focusTab = true) {
   S.chosen = {type: "case", kind, id, parts: undefined}; S.detailTab = "content";
-  if (focusTab) S.rightTab = "doc";
+  if (focusTab) { S.rightTab = "doc"; S.listOnly = false; }
   renderList(); renderReader();
   await metaOf(kind);
   const r = S.metaById[kind].get(id);
@@ -1842,6 +1948,7 @@ $("#backAsk").onclick = () => {
   });
 };
 function renderReader() {
+  queueMicrotask(renderLayout);
   queueMicrotask(updateBackAsk);
   queueMicrotask(renderDock);
   const el = $("#reader");
@@ -1850,7 +1957,7 @@ function renderReader() {
   if (!showNb && S.rightTab === "notebook") S.rightTab = "doc";
   if (!showAi && S.rightTab === "ai") S.rightTab = "doc";
   if (PUBLIC && S.rightTab === "ask") S.rightTab = "doc";
-  if (S.rightTab === "doc" && !S.chosen && !showNb && !PUBLIC) S.rightTab = "ask";
+  if (S.rightTab === "doc" && !S.chosen && !showNb && !PUBLIC && !S.listOnly) S.rightTab = "ask";
   const L = S.chosen && S.chosen.type === "law" ? S.byMst.get(S.chosen.id) : null;
   const docTitle = L ? L.title : S.chosen && S.chosen.row ? S.chosen.row[1] : "문서";
   const tabs = tabsHtml();
@@ -1860,6 +1967,7 @@ function renderReader() {
     ${showAi ? `<button type="button" role="tab" data-rt="ai" aria-selected="${S.rightTab === "ai"}">🤖 AI 요약</button>` : ""}
     ${S.chosen ? `<button type="button" role="tab" data-rt="doc" aria-selected="${S.rightTab === "doc"}">📄 ${esc(docTitle)}</button>` : ""}</nav>`; }
   el.classList.toggle("reader-law", !!L && S.rightTab === "doc");
+  if (S.listOnly && S.rightTab === "doc" && !S.chosen) { el.innerHTML = tabs; bindTabs(); return; }  // hidden: only the results show
   if (S.rightTab === "guide") { el.innerHTML = tabs + guideHtml(); bindTabs(); bindGuide(); return; }
   if (showNb && S.rightTab === "notebook") { el.innerHTML = tabs + `<div id="nbView"></div>`; bindTabs(); renderNotebook(); return; }
   if (showAi && S.rightTab === "ai") { el.innerHTML = tabs + `<div id="aiView"></div>`; bindTabs(); renderSearchAi(); return; }
@@ -1880,7 +1988,9 @@ function lawHtml(L) {
     <h2>${esc(L.title)}</h2><div class="meta">${esc(L.ministry)} · 시행 ${esc(L.effective || "-")} · 법령일련번호 ${esc(L.mst)}</div>
     ${S.filters.some((f) => f.mst === L.mst) ? "" : `<button type="button" class="ghost small add-filter" id="addFilter">+ 법령 필터에 추가</button>`}
     <button type="button" class="ghost small add-filter" id="toCompare">📑 다른 법령과 비교</button>
-    ${LIB.byLaw && LIB.byLaw.get(L.mst) ? `<button type="button" class="ghost small add-filter" id="toLib">⚖ 충돌·중복 분석 ${n(LIB.byLaw.get(L.mst).length)}건</button>` : ""}</div>
+    ${S.split ? "" : `<button type="button" class="secondary small add-filter" id="selLaw" title="옆에 법령 비교를 띄우고 연계도의 가운데로 (결과를 두 번 눌러도 됨)">📌 선택 · 옆에 비교</button>`}
+    <button type="button" class="ghost small add-filter" id="toGraph">🕸 연계도</button>
+    ${favBtn("law", L.mst, null, true)}</div>
     <nav class="reader-tabs" role="tablist" aria-label="문서 보기"><button role="tab" data-dt="content" aria-selected="${S.detailTab !== "source"}">내용</button>
     <button role="tab" data-dt="source" aria-selected="${S.detailTab === "source"}">출처와 날짜</button></nav>`;
   if (S.detailTab === "source") return `<div class="law-main">${head}<div class="reader-content">${sourceTable([
@@ -1900,14 +2010,16 @@ function lawHtml(L) {
       <button type="button" class="ghost small" id="prevHit" ${matches.length ? "" : "disabled"} aria-label="이전">▲</button>
       <button type="button" class="ghost small" id="nextHit" ${matches.length ? "" : "disabled"} aria-label="다음">▼</button>
       ${matches.length ? `<label class="check-row"><input type="checkbox" id="onlyHits" ${S.onlyMatches ? "checked" : ""}> 찾은 조문만 보기</label>` : ""}</div>
-    ${shown.map((a) => `<article class="reading-article ${cur === a ? "find-current" : ""}" id="art-${a.i}"><h3>${highlight(a.h, S.lawFind)}</h3><p>${highlight(a.t, S.lawFind)}</p></article>`).join("")}
+    ${shown.map((a) => `<article class="reading-article ${cur === a ? "find-current" : ""}" id="art-${a.i}"><h3>${highlight(a.h, S.lawFind)}</h3><p>${lawLinks(highlight(a.t, S.lawFind), L.mst)}</p></article>`).join("")}
   </div></div><aside class="case-panel" id="casePanel" aria-label="이 법령의 사례" tabindex="-1"></aside></div>`;
 }
 function bindLaw(L) {
   $("#reader").querySelectorAll("[data-dt]").forEach((b) => b.onclick = () => { S.detailTab = b.dataset.dt; renderReader(); });
   if ($("#addFilter")) $("#addFilter").onclick = () => addFilter(L.mst);
-  if ($("#toLib")) $("#toLib").onclick = () => { LIB.law = L.mst; LIB.q = ""; LIB.sev = ""; showPage("conflict"); };
   if ($("#toCompare")) $("#toCompare").onclick = () => { CMP.a = L.mst; CMP.b = null; $("#cmpA").value = L.title; $("#cmpB").value = ""; showPage("compare"); $("#cmpB").focus(); };
+  if ($("#selLaw")) $("#selLaw").onclick = () => selectLaw(L.mst);
+  if ($("#toGraph")) $("#toGraph").onclick = () => { $("#gCenter").value = L.title; showPage("graph"); if (G.center !== L.mst) buildGraph(L.mst); };
+  bindFavBtns($("#reader"));
   const find = $("#lawFind");
   if (!find) return;
   const d = S.chosen.data;
@@ -1979,14 +2091,14 @@ async function renderCasePanel() {
 function closeCaseDoc() { const top = S.casePanelScroll; S.caseOpen = null; renderCasePanel().then(() => { if ($("#casePanel")) $("#casePanel").scrollTop = top || 0; }); S.casePanelScroll = top; }
 function partsHtml(parts, kind, id) {
   if (!parts) return `<p class="meta">이 자료는 아직 본문을 받지 않았습니다(목록만 있음). 아래 원문 링크에서 볼 수 있고, 다음 DB 업데이트 때 본문이 들어옵니다.</p>`;
-  return parts.map(([h, t]) => `<section class="case-section"><h4>${esc(h)}</h4><p>${highlight(t, S.query)}</p></section>`).join("");
+  return parts.map(([h, t]) => `<section class="case-section"><h4>${esc(h)}</h4><p>${lawLinks(highlight(t, S.query))}</p></section>`).join("");
 }
 function caseDocHtml() {
   const {kind, id, row: r, parts} = S.chosen;
   if (parts === undefined) return `<p class="empty">불러오는 중…</p>`;
   const info = kind === "ordin" ? [r[2], r[5], r[6] && "시행 " + r[6]] : [r && r[2], r && r[3]];
   const head = `<div class="reader-head"><span class="type-label">${LABEL[kind]}</span><h2>${esc(r ? r[1] : "")}</h2>
-    <div class="meta">${esc(info.filter(Boolean).join(" · "))}</div></div>
+    <div class="meta">${esc(info.filter(Boolean).join(" · "))}</div>${r ? favBtn(kind, id, null, true) : ""}</div>
     <nav class="reader-tabs" role="tablist" aria-label="문서 보기"><button role="tab" data-dt="content" aria-selected="${S.detailTab !== "source"}">내용</button>
     <button role="tab" data-dt="source" aria-selected="${S.detailTab === "source"}">출처와 날짜</button></nav>`;
   if (S.detailTab === "source") return head + `<div class="reader-content">${sourceTable([
@@ -2412,8 +2524,10 @@ function guideHtml() {
       <li>자치법규 ${S.index && S.index.ordinances && S.index.ordinances.listed ? n(S.index.ordinances.listed) + "건" : "아직 없음 (다음 DB 업데이트 때 추가 예정)"}</li></ul>
       <p><b>검색은 로그인 없이</b> 누구나 쓸 수 있고, <b>Claude 기능</b>(묻기·요약·설명·노트북)은 claude.ai에 로그인했을 때만 쓸 수 있습니다. Claude 기능은 쓰는 사람 본인의 Claude 사용량을 쓰고, 처음 쓸 때 허용을 한 번 묻습니다.</p>`)}
     ${sec("2. 검색하기", `<ul><li>검색창에 법령 이름이나 낱말(예: 수의계약, 공유재산)을 넣고 <b>[검색]</b> 또는 Enter.</li>
-      <li>법령 이름과 <b>조문 내용</b>까지 찾습니다. 조문까지 찾는 동안 위쪽에 진행 막대가 보입니다.</li>
-      <li>지자체 관련 법령이 먼저 나오고, 법률·시행령·시행규칙은 한 묶음으로 나옵니다. <span class="type-label local-badge">지자체</span>는 지자체 관련 법령, <span class="type-label">조문 10</span>은 검색어가 든 조문 수입니다.</li>
+      <li><b>법령 이름과 자치법규(조례·규칙) 이름</b>에서 먼저 찾습니다. 낱말을 띄어 써도 되고(예: <b>태안군 주민자치회</b>), 지자체 이름이 들어가면 그 지자체의 자치법규가 먼저 나옵니다. 찾은 법령의 법률·시행령·시행규칙은 한 묶음으로 함께 나옵니다.</li>
+      <li>처음에는 <b>결과만 넓게</b> 보이고, 카드마다 그 법령의 목적(제1조) 같은 대략적인 내용이 나옵니다. 카드를 누르면 지금처럼 결과와 본문이 나란히 보이고, [⤢ 결과만 보기]로 다시 넓힙니다.</li>
+      <li>조문 내용까지 찾으려면 결과 위 <b>[📄 조문 내용에서도 찾기]</b>를 누르세요. 이름에 맞는 법령이 없으면 조문 내용에서 바로 찾습니다. <span class="type-label">조문 10</span>은 검색어가 든 조문 수입니다.</li>
+      <li>결과 위 종류 칩(법률·시행령·시행규칙·자치법규)을 누르면 그 종류만 봅니다.</li>
       <li><b>☆</b>를 누르면 검색어가 저장되어 검색창 아래에 버튼으로 남습니다.</li></ul>`)}
     ${sec("3. 자료 종류와 법령 필터", `<ul><li><b>종류 탭</b>(전체 · 법령 · 판례 · 행정심판례 · 법령해석례 · 행정규칙 · 자치법규)으로 찾을 자료를 고릅니다. ‘전체’는 관련 법령을 보여 주고, 맞는 법령이 없으면 사례를 바로 보여 줍니다.</li>
       <li><b>법령 필터</b>: [+ 법령 추가]를 눌러 법령을 체크하고 <b>[확인]</b>을 누르면 <b>그 법령들 안에서만</b> 찾습니다(🔒 표시). Claude에게 묻기도 그 법령들 안에서만 찾습니다. 칩을 눌러 넣고 빼고, [전체 법령]을 누르면 풀립니다.</li>
@@ -2422,6 +2536,7 @@ function guideHtml() {
       <li>체크하면 오른쪽에 <b>📓 노트북</b> 탭이 생겨, 체크한 법령을 Claude가 함께 정리합니다(최대 ${MAX_PICK}개).</li></ul>`)}
     ${sec("5. 본문 보기", `<ul><li>결과를 누르면 오른쪽에 조문 전체가 나오고, 검색어가 노랗게 표시됩니다.</li>
       <li><b>이 법령에서 찾기</b>(Ctrl+F): 다른 낱말로 바꿔 찾을 수 있고, ▲▼(또는 Enter / Shift+Enter)로 찾은 조문을 오가며, ‘찾은 조문만 보기’를 끄면 전체 조문이 보입니다.</li>
+      <li>본문의 <b>「법령명」</b>(밑줄)을 누르면 그 법령이 창으로 뜹니다. 「법령명」 제34조처럼 조문이 붙어 있으면 그 조문으로 갑니다. 창 안에서 다른 「법령명」을 눌러 이어 보고, [← 이전 법령]으로 돌아옵니다.</li>
       <li>법령 오른쪽 <b>이 법령의 사례</b>: 이 법령을 참조한 판례, 법령명이 나오는 해석례·재결례입니다. 누르면 그 자리에서 본문이 열리고 [← 목록으로]로 돌아옵니다.</li>
       <li>‘본문 없음’ 표시가 있는 자료는 아직 목록만 받은 것입니다. [국가법령정보센터 원문 ↗]으로 원문을 볼 수 있습니다.</li>
       <li>‘출처와 날짜’ 탭에서 일련번호, 시행일, 자료 기준일, 원문 링크를 확인합니다.</li></ul>`)}
@@ -2446,14 +2561,15 @@ function guideHtml() {
     ${sec("10. 자료 업데이트", `<p>관리자(소유자·편집자)는 위쪽 <b>[DB 업데이트]</b>로 새 자료를 올립니다. JG법령수집의 <span class="mono">archive.db</span>를 바로 고르면 이 브라우저 안에서 자료 묶음으로 바꿔 바뀐 파일만 올리고(파일은 다른 곳으로 보내지 않음), [아티팩트용 내보내기] 폴더를 골라도 됩니다. 올리면 링크로 보는 모든 사람에게 새 자료가 보이고, 열어 둔 화면에는 ‘새 자료로 보기’ 안내가 뜹니다. 로그인하지 않은 사람은 처음 게시한 자료를 봅니다.</p>`)}
     ${sec("11. 법령 연계도", `<p>위쪽 <b>🕸 법령 연계도</b>에서 법령 하나를 가운데에 두고, 그 법령과 이어진 법령을 그림으로 봅니다. 열어 둔 법령이 있으면 그 법령으로 시작합니다.</p>
       <ul><li><b>파란 화살표(위임)</b>: 법률 → 시행령 → 시행규칙.</li><li><b>회색 화살표(인용)</b>: 조문에 「법령명」으로 다른 법령을 적은 경우(가운데 법령이 인용한 법령, 가운데 법령을 인용한 법령 — 많이 인용한 18개).</li>
-      <li><b>빨간 점선</b>: ⚖ 충돌·중복 분석에서 찾은 관계.</li><li>노드를 누르면 그 법령이 <b>창으로 떠서</b> 바로 읽고 찾을 수 있습니다(본문 화면에서 열기, 가운데로, 비교에 넣기). 노드를 끌어 옮기고, 빈 곳을 끌어 이동, 휠·＋−로 확대·축소.</li></ul>`)}
-    ${sec("12. 충돌·중복 분석", `<p>위쪽 <b>⚖ 충돌·중복 분석</b>에는 <b>미리 분석한 결과</b>가 있습니다. 지자체 관련 법령 묶음마다 가장 많이 이어진 법령의 조문을 Claude가 비교해 <b>중복·충돌·공백</b>을 심각도(높음·중간·낮음)별로 정리했습니다.</p>
-      <ul><li>법령 이름·낱말, 종류, 심각도로 거를 수 있고, 근거 조문 버튼을 누르면 그 조문이 창으로 뜹니다. 법령 본문 위 [⚖ 충돌·중복 분석 N건]을 누르면 그 법령의 결과만 봅니다.</li>
-      <li>근거 조문이 없는 항목에는 <span class="ext-badge">외부</span>가 붙습니다. AI 분석이라 공식 해석이 아니니 반드시 원문으로 확인하세요.</li>
-      <li>Claude를 쓸 수 있는 화면에서는 아래 [직접 분석하기]로 법령 2~6개를 골라 바로 분석할 수도 있습니다.</li></ul>`)}
-    ${sec("13. 법령 비교", `<p>위쪽 <b>📑 법령 비교</b>에서 법령 두 개를 고르면 나란히 보여 줍니다. 법령 본문 위 [📑 다른 법령과 비교]나 연계도 창의 [📑 비교에 넣기]로도 시작합니다.</p>
+      <li>노드를 누르면 그 법령이 <b>창으로 떠서</b> 바로 읽고 찾을 수 있습니다(본문 화면에서 열기, 가운데로, 비교에 넣기). 노드를 끌어 옮기고, 빈 곳을 끌어 이동, 휠·＋−로 확대·축소.</li></ul>`)}
+    ${sec("12. 법령 비교", `<p>위쪽 <b>📑 법령 비교</b>에서 법령 두 개를 고르면 나란히 보여 줍니다. 법령 본문 위 [📑 다른 법령과 비교]나 연계도 창의 [📑 비교에 넣기]로도 시작합니다.</p>
       <ul><li><b>비슷한 조문끼리 짝지어 보기</b>: 뜻이 가장 비슷한 조문끼리 짝짓고 비슷한 정도(%)를 보여 줍니다. <mark class="d-del">왼쪽에만 있는 말</mark>과 <mark class="d-ins">오른쪽에만 있는 말</mark>이 표시됩니다.</li>
       <li><b>조문 순서대로 나란히 보기</b>와 낱말로 거르기도 됩니다. 조문 제목을 누르면 그 조문이 열립니다.</li></ul>`)}
+    ${sec("13. 법령 선택 (두 번 누르기)", `<ul><li>결과의 법령을 <b>두 번 누르면</b>(또는 본문 위 [📌 선택 · 옆에 비교]) 그 법령이 선택됩니다. 본문 옆에 <b>법령 비교</b>가 뜨고, 처음에는 그 법령의 시행령(또는 상위 법률)과 비교합니다.</li>
+      <li>비교할 법령은 위쪽 칩(상위·하위·많이 인용한 법령)이나 이름 칸으로 바꿉니다. 조문 제목을 누르면 그 조문이 창으로 뜹니다.</li>
+      <li>선택한 법령은 <b>🕸 법령 연계도</b>의 가운데에도 놓입니다([🕸 연계도]로 바로 가기). [← 결과 목록]이나 ✕로 비교를 닫습니다.</li></ul>`)}
+    ${sec("14. ★ 즐겨찾기", `<ul><li>결과 카드의 <b>☆</b>나 본문 위 [☆ 즐겨찾기]를 누르면 검색창 아래 <b>★ 즐겨찾기</b> 줄에 남습니다. 누르면 열리고, 두 번 누르면 선택(옆에 비교)되며, ×로 뺍니다.</li>
+      <li>즐겨찾기는 <b>이 브라우저에만</b> 저장됩니다. 다른 컴퓨터·브라우저와 나누지 않으며, 인터넷 사용 기록에서 쿠키·사이트 데이터를 지우면 함께 지워집니다.</li></ul>`)}
     </div></div>`;
 }
 function bindGuide() {
@@ -3080,7 +3196,7 @@ async function buildGraph(mst) {
   }
   G.nodes = [...nodes.values()];
   await loadLibrary();
-  G.edges = edges.concat(conflictEdges(new Set(nodes.keys())), libraryEdges(new Set(nodes.keys())));
+  G.edges = edges.concat(conflictEdges(new Set(nodes.keys())));
   for (const e of G.edges) { const a = nodes.get(e.a), b = nodes.get(e.b); if (a) a.out++; if (b) b.in++; }
   G.built = {cites: cites.length, citing: citing.size};
   layoutGraph();
@@ -3393,23 +3509,30 @@ async function openArticle(mst, art, heading) {
   requestAnimationFrame(() => { const a = document.getElementById("art-" + i); if (a) { a.scrollIntoView({block: "center"}); a.classList.add("find-current"); } });
 }
 // A law in a window over the page (법령 연계도): read it without leaving the graph.
-async function openLawWindow(mst) {
+const LW = {cur: null, stack: []};
+$("#dlg").addEventListener("close", () => { LW.cur = null; LW.stack = []; });
+// target: an article index, or "제34조" from 「법령명」 제34조 in the text.
+async function openLawWindow(mst, target = null, back = false) {
   const L = S.byMst.get(mst);
   if (!L) return;
+  const prev = $("#dlg").open ? LW.cur : null;
+  if (prev && prev !== mst && !back) LW.stack.push(prev);
   const body = openDialog(L.title, `<p class="meta">불러오는 중…</p>`);
+  LW.cur = mst;
   const d = await lawData(mst);
   if ($("#dlgTitle").textContent !== L.title) return;
   let q = "";
   const draw = () => {
     const qc = compact(q), arts = d.a.map(([h, t], i) => ({i, h, t: cleanArticle(h, t)})).filter((a) => !qc || has(qc)(a.h + a.t));
-    $("#lwArts").innerHTML = arts.length ? arts.map((a) => `<article class="reading-article" id="lw-${a.i}"><h3>${highlight(a.h, q)}</h3><p>${highlight(a.t, q)}</p></article>`).join("")
+    $("#lwArts").innerHTML = arts.length ? arts.map((a) => `<article class="reading-article" id="lw-${a.i}"><h3>${highlight(a.h, q)}</h3><p>${lawLinks(highlight(a.t, q), mst)}</p></article>`).join("")
       : '<p class="empty">찾는 낱말이 든 조문이 없습니다.</p>';
     $("#lwCount").textContent = qc ? `찾은 조문 ${n(arts.length)} / ${n(d.a.length)}` : `조문 ${n(d.a.length)}`;
   };
   body.innerHTML = `<div class="lw-head">${typeBadge(lawType(L), L.kind)} <span class="meta">${esc(L.kind)} · ${esc(L.ministry)} · 시행 ${esc(L.effective || "-")}</span></div>
-    <div class="lw-actions"><button type="button" class="primary small" id="lwOpen">본문 화면에서 열기</button>
+    <div class="lw-actions">${LW.stack.length ? `<button type="button" class="ghost small" id="lwBack">← ${esc((S.byMst.get(LW.stack[LW.stack.length - 1]) || {title: "이전 법령"}).title)}</button>` : ""}
+      <button type="button" class="primary small" id="lwOpen">본문 화면에서 열기</button>
       ${G.center && mst !== G.center ? `<button type="button" class="secondary small" id="lwCenter">이 법령을 연계도 가운데로</button>` : ""}
-      <button type="button" class="ghost small" id="lwCmp">📑 비교에 넣기</button>
+      <button type="button" class="ghost small" id="lwCmp">📑 비교에 넣기</button>${favBtn("law", mst, null, true)}
       <a class="ghost small" style="display:inline-flex;align-items:center;text-decoration:none" href="${ORIGINAL.law(mst)}" target="_blank" rel="noopener noreferrer">원문 ↗</a></div>
     <div class="law-find lw-find"><label class="vh" for="lwFind">이 법령에서 찾기</label><input id="lwFind" type="search" placeholder="이 법령에서 찾기"><span class="find-count" id="lwCount"></span></div>
     <div class="lw-arts" id="lwArts"></div>`;
@@ -3417,7 +3540,131 @@ async function openLawWindow(mst) {
   $("#lwOpen").onclick = () => { $("#dlg").close(); showPage("search"); S.rightTab = "doc"; openLaw(mst); };
   if ($("#lwCenter")) $("#lwCenter").onclick = () => { $("#dlg").close(); $("#gCenter").value = L.title; buildGraph(mst); };
   $("#lwCmp").onclick = (e) => { addCompare(mst); e.target.textContent = "비교에 넣었습니다"; };
+  if ($("#lwBack")) $("#lwBack").onclick = () => openLawWindow(LW.stack.pop(), null, true);
+  bindFavBtns(body);
   draw();
+  if (target != null) {
+    const i = typeof target === "number" ? target : d.a.findIndex(([h]) => h && (h === target || h.startsWith(target + "(") || h.startsWith(target + " ")));
+    const el = i >= 0 && document.getElementById("lw-" + i);
+    if (el) { el.classList.add("find-current"); requestAnimationFrame(() => el.scrollIntoView({block: "start"})); }
+  }
+}
+// 「법령명」 in a text: a button that opens that law in a window (to the article when 「…」 제N조 follows).
+function lawLinks(html, self = null) {
+  return html.replace(/「((?:(?!」).){2,160}?)」(\s*제\d+조(?:의\d+)?)?/g, (all, inner, art) => {
+    const L = lawByName(inner.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"'));
+    if (!L || L.mst === self) return all;
+    return `<button type="button" class="law-ref" data-ref="${L.mst}"${art ? ` data-art="${art.trim()}"` : ""} title="${esc(L.title)} — 눌러서 창으로 보기">${all}</button>`;
+  });
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest(".law-ref");
+  if (!b) return;
+  e.preventDefault();
+  openLawWindow(b.dataset.ref, b.dataset.art || null);
+});
+
+/* ---------------------------------------------------------------- 선택한 법령: 옆에 법령 비교 */
+// Double-click (or [📌 선택]) on a law: the law stays on screen with the comparison beside it, and the
+// 법령 연계도 starts from it. The other side is its statute / decree first, or another law picked here.
+function familyPartner(L) {
+  const fam = S.laws.filter((x) => x.family === L.family && x.mst !== L.mst).sort((a, b) => a.level - b.level);
+  const p = L.level === 0 ? fam.find((x) => x.level === 1) || fam[0] : fam.find((x) => x.level === 0) || fam[0];
+  return p ? p.mst : null;
+}
+function selectLaw(mst) {
+  const L = S.byMst.get(mst);
+  if (!L) return;
+  S.split = true; S.listOnly = false; S.rightTab = "doc";
+  if (CMP.a !== mst) { CMP.a = mst; CMP.b = familyPartner(L); }
+  $("#gCenter").value = L.title;
+  if (!S.chosen || S.chosen.id !== mst) openLaw(mst); else { renderList(); renderReader(); }
+  renderSideCmp();
+  requestAnimationFrame(() => $(".workspace").scrollIntoView({block: "start", behavior: "smooth"}));
+}
+async function renderSideCmp() {
+  const box = $("#sideCmp");
+  if (!S.split || !CMP.a) { box.hidden = true; box.innerHTML = ""; return; }
+  const A = S.byMst.get(CMP.a), B = CMP.b ? S.byMst.get(CMP.b) : null;
+  const fam = S.laws.filter((x) => x.family === A.family && x.mst !== A.mst).sort((a, b) => a.level - b.level);
+  const chip = (x, why) => `<button type="button" class="filter-chip ${x.mst === CMP.b ? "chosen" : ""}" data-scb="${x.mst}" title="${esc(x.title)}">${typeBadge(lawType(x))} ${esc(x.title)}${why ? ` <small>${why}</small>` : ""}</button>`;
+  box.hidden = false;
+  box.innerHTML = `<div class="side-cmp-head"><h2>📑 법령 비교</h2>
+      <span class="side-cmp-btns"><button type="button" class="ghost small" id="scList">← 결과 목록</button><button type="button" class="ghost small" id="scGraph">🕸 연계도</button>
+      <button type="button" class="ghost small" id="scClose" aria-label="비교 닫기" title="비교 닫기">✕</button></span></div>
+    <div class="side-cmp-pick">${typeBadge(lawType(A))} <b>${esc(A.title)}</b> <span aria-hidden="true">↔</span>
+      <label class="vh" for="scB">비교할 법령</label><input id="scB" list="scBOpt" autocomplete="off" value="${B ? esc(B.title) : ""}" placeholder="비교할 법령 이름"><datalist id="scBOpt"></datalist></div>
+    <div class="side-cmp-chips" id="scChips">${fam.map((x) => chip(x, x.level < A.level ? "상위" : "하위")).join("")}</div>
+    <div class="conf-row"><label class="vh" for="scMode">보기</label><select id="scMode"><option value="pair" ${CMP.mode === "pair" ? "selected" : ""}>비슷한 조문끼리 짝지어 보기</option><option value="order" ${CMP.mode === "order" ? "selected" : ""}>조문 순서대로 나란히 보기</option></select>
+      <label class="vh" for="scFind">낱말로 거르기</label><input id="scFind" type="search" placeholder="낱말로 거르기" value="${esc(CMP.q)}"></div>
+    <div id="sideCmpResult"></div>`;
+  const pickB = (m) => { CMP.b = m && m !== CMP.a ? m : null; renderSideCmp(); };
+  box.querySelectorAll("[data-scb]").forEach((b) => b.onclick = () => pickB(b.dataset.scb));
+  $("#scB").addEventListener("input", () => fillLawOptions($("#scB"), $("#scBOpt")));
+  $("#scB").addEventListener("change", () => { const L = lawFromBox($("#scB")); if (L && L.mst !== CMP.b) pickB(L.mst); });
+  $("#scB").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); $("#scB").dispatchEvent(new Event("change")); } });
+  $("#scMode").onchange = (e) => { CMP.mode = e.target.value; $("#cmpMode").value = CMP.mode; renderCompare($("#sideCmpResult")); };
+  $("#scFind").oninput = (e) => { CMP.q = e.target.value; $("#cmpFind").value = CMP.q; renderCompare($("#sideCmpResult")); };
+  $("#scList").onclick = () => { S.split = false; renderList(); renderReader(); };
+  $("#scClose").onclick = () => { S.split = false; renderList(); renderReader(); };
+  $("#scGraph").onclick = () => { $("#gCenter").value = A.title; showPage("graph"); if (G.center !== A.mst) buildGraph(A.mst); };
+  renderCompare($("#sideCmpResult"));
+  // The laws its articles name most (「법령명」) as more choices.
+  const d = await lawData(A.mst);
+  if (!$("#scChips") || CMP.a !== A.mst) return;
+  const famSet = new Set(fam.map((x) => x.mst));
+  const cited = [...citedNames(d.a)].sort((x, y) => y[1] - x[1]).map(([k]) => lawByName(k)).filter((x) => x && x.mst !== A.mst && !famSet.has(x.mst)).slice(0, 6);
+  $("#scChips").insertAdjacentHTML("beforeend", cited.map((x) => chip(x, "인용")).join(""));
+  $("#scChips").querySelectorAll("[data-scb]").forEach((b) => b.onclick = () => pickB(b.dataset.scb));
+}
+
+/* ---------------------------------------------------------------- ★ 즐겨찾기 (this browser only) */
+// Kept in this browser's storage: clearing the browsing data (사이트 데이터) clears them too.
+function isFav(k, id) { return S.favs.some((f) => f.k === k && f.id === id); }
+function favBtn(k, id, i, big = false) {
+  const on = isFav(k, id);
+  return `<button type="button" class="fav-btn ${big ? "ghost small add-filter fav-big" : ""} ${on ? "on" : ""}" ${i != null ? `data-fav="${i}"` : `data-fk="${esc(k)}" data-fid="${esc(id)}"`}
+    aria-pressed="${on}" aria-label="즐겨찾기" title="${on ? "즐겨찾기에서 빼기" : "즐겨찾기에 넣기 (이 브라우저에 저장)"}">${on ? "★" : "☆"}${big ? " 즐겨찾기" : ""}</button>`;
+}
+function bindFavBtns(root) {
+  root.querySelectorAll("[data-fk]").forEach((b) => b.onclick = () => {
+    const k = b.dataset.fk, id = b.dataset.fid;
+    const title = k === "law" ? (S.byMst.get(id) || {}).title : ((S.metaById[k] && S.metaById[k].get(id)) || [])[1];
+    toggleFav(k, id, title || id);
+  });
+}
+function toggleFav(k, id, title) {
+  S.favs = isFav(k, id) ? S.favs.filter((f) => !(f.k === k && f.id === id)) : [{k, id, title}, ...S.favs].slice(0, 60);
+  store.set("favs", S.favs);
+  renderFavs();
+  document.querySelectorAll(".fav-btn").forEach((b) => {
+    const it = b.dataset.fav != null ? resultPool()[+b.dataset.fav] : null;
+    const bk = it ? (it.type === "law" ? "law" : it.kind) : b.dataset.fk, bid = it ? (it.type === "law" ? it.mst : it.id) : b.dataset.fid;
+    if (bk !== k || bid !== id) return;
+    const on = isFav(k, id), big = b.classList.contains("fav-big");
+    b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); b.textContent = (on ? "★" : "☆") + (big ? " 즐겨찾기" : "");
+    b.title = on ? "즐겨찾기에서 빼기" : "즐겨찾기에 넣기 (이 브라우저에 저장)";
+  });
+}
+function renderFavs() {
+  const el = $("#favs");
+  if (!el) return;
+  const list = S.favs.filter((f) => f.k !== "law" || !S.index || S.byMst.has(f.id));
+  el.hidden = !list.length;
+  el.innerHTML = list.length ? `<span class="saved-title" title="이 브라우저에만 저장됩니다. 인터넷 사용 기록(쿠키·사이트 데이터)을 지우면 함께 지워집니다.">★ 즐겨찾기</span><ul>${list.map((f, i) => {
+    const L = f.k === "law" ? S.byMst.get(f.id) : null;
+    return `<li><button type="button" class="saved-run" data-fo="${i}" title="${esc(L ? L.title : f.title)} (두 번 누르면 선택·옆에 비교)">${esc(L ? L.title : f.title)}<small>${esc(L ? lawType(L) : LABEL[f.k] || "")}</small></button>
+      <button type="button" class="saved-delete" data-fd="${i}" aria-label="즐겨찾기에서 빼기: ${esc(f.title)}" title="빼기">×</button></li>`; }).join("")}</ul>` : "";
+  el.querySelectorAll("[data-fo]").forEach((b) => {
+    const f = list[+b.dataset.fo];
+    b.onclick = (e) => {
+      clearTimeout(S.clickTimer);
+      if (f.k === "law" && e.detail >= 2) return selectLaw(f.id);
+      const go = () => { showPage("search"); S.rightTab = "doc"; S.split = S.split && f.k === "law"; if (f.k === "law") openLaw(f.id); else openCase(f.k, f.id); };
+      if (f.k === "law") S.clickTimer = setTimeout(go, 240); else go();
+    };
+  });
+  el.querySelectorAll("[data-fd]").forEach((b) => b.onclick = () => { const f = list[+b.dataset.fd]; toggleFav(f.k, f.id, f.title); });
 }
 
 /* ---------------------------------------------------------------- 📑 법령 비교 */
@@ -3425,12 +3672,13 @@ async function openLawWindow(mst) {
 // second (shared two-letter pieces), the words that differ marked; or both in their own order.
 const CMP = {a: null, b: null, mode: "pair", q: "", only: "all"};
 function addCompare(mst) {
+  if (S.split && (S.page || "search") === "search") { if (mst !== CMP.a) { CMP.b = mst; renderSideCmp(); } return; }
   if (!CMP.a || CMP.a === mst) CMP.a = CMP.a || mst; else if (!CMP.b) CMP.b = mst; else { CMP.a = CMP.b; CMP.b = mst; }
   if (CMP.a === CMP.b) CMP.b = null;
   if (S.page === "compare") renderCompare();
 }
 function renderComparePage() {
-  for (const [k, id] of [["a", "#cmpA"], ["b", "#cmpB"]]) if (CMP[k] && !$(id).value) $(id).value = S.byMst.get(CMP[k]).title;
+  for (const [k, id] of [["a", "#cmpA"], ["b", "#cmpB"]]) if (CMP[k]) $(id).value = S.byMst.get(CMP[k]).title;
   if (!CMP.a && !CMP.b) {
     const pick = [...S.selected, ...S.picked.keys()];
     if (S.chosen && S.chosen.type === "law") pick.unshift(S.chosen.id);
@@ -3468,8 +3716,8 @@ function wordDiff(a, b) {
   const paint = (words, keep, cls) => words.map((w, i) => (keep.has(i) || !w ? esc(w) : `<mark class="${cls}">${esc(w)}</mark>`)).join(" ");
   return [paint(wa, keepA, "d-del"), paint(wb, keepB, "d-ins")];
 }
-async function renderCompare() {
-  const box = $("#cmpResult"), run = (CMP.run = (CMP.run || 0) + 1);
+async function renderCompare(box = $("#cmpResult")) {
+  const run = (CMP.run = (CMP.run || 0) + 1), side = box.id === "sideCmpResult";
   if (!CMP.a || !CMP.b) { box.innerHTML = `<p class="empty">비교할 법령 두 개를 고르세요. 법령 이름을 넣거나, 법령 연계도 창의 [📑 비교에 넣기], 법령 필터·체크한 법령을 씁니다.</p>`; return; }
   const La = S.byMst.get(CMP.a), Lb = S.byMst.get(CMP.b);
   box.innerHTML = '<p class="meta">조문을 맞춰 보는 중…</p>';
@@ -3511,13 +3759,13 @@ async function renderCompare() {
     <div class="cmp-legend meta"><mark class="d-del">왼쪽에만 있는 말</mark> <mark class="d-ins">오른쪽에만 있는 말</mark> · 조문 제목을 누르면 그 조문이 열립니다</div>
     <div class="cmp-head"><div>${esc(La.title)}</div><div>${esc(Lb.title)}</div></div>
     <div class="cmp-grid ${CMP.mode === "pair" ? "paired" : ""}">${rows || '<p class="empty">찾는 낱말이 든 조문이 없습니다.</p>'}</div>`;
-  box.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => openArticle(b.dataset.open, +b.dataset.art, b.dataset.h));
+  box.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => side ? openLawWindow(b.dataset.open, +b.dataset.art) : openArticle(b.dataset.open, +b.dataset.art, b.dataset.h));
 }
 
 /* ---------------------------------------------------------------- 미리 분석한 충돌·중복 (analysis/conflicts.json) */
 // Analyses Claude made ahead of time for the local-government laws, the same file in the artifact
 // and the public copy. Every card cites the articles it rests on; one without any is 외부.
-const LIB = {data: null, tried: false, q: "", sev: "", type: "", law: ""};
+const LIB = {data: null, tried: false, q: "", sev: "", type: "", law: "", field: ""};
 async function loadLibrary() {
   if (LIB.tried) return LIB.data;
   LIB.tried = true;
@@ -3556,7 +3804,8 @@ async function renderLibrary() {
   const counts = {high: 0, medium: 0, low: 0};
   all.forEach(({it}) => counts[it.severity]++);
   const types = [...new Set(all.map(({it}) => it.type))];
-  const match = ({g, it}) => (!LIB.sev || it.severity === LIB.sev) && (!LIB.type || it.type === LIB.type)
+  const fields = [...new Set(data.groups.map((g) => g.field || "지자체"))];
+  const match = ({g, it}) => (!LIB.field || (g.field || "지자체") === LIB.field) && (!LIB.sev || it.severity === LIB.sev) && (!LIB.type || it.type === LIB.type)
     && (!LIB.law || it.laws.includes(LIB.law) || g.laws.includes(LIB.law))
     && (!qc || has(qc)([it.title, it.description, it.issue, ...it.laws.map((m) => (S.byMst.get(m) || {}).title || ""), (S.byMst.get(g.main) || {}).title || ""].join(" ")));
   const weight = (items) => items.reduce((a, it) => a + {high: 100, medium: 10, low: 1}[it.severity], 0);
@@ -3565,10 +3814,11 @@ async function renderLibrary() {
   const shownN = groups.reduce((a, x) => a + x.items.length, 0);
   const lawName = LIB.law && S.byMst.get(LIB.law) ? S.byMst.get(LIB.law).title : "";
   box.innerHTML = `<div class="panel lib-head">
-      <h2>📚 미리 분석한 충돌·중복 <span class="meta">지자체 관련 법령 ${n(data.groups.length)}묶음 · ${n(all.length)}건 · 분석 ${esc(String(data.analyzedAt || "").slice(0, 10))} (자료 ${esc(String(data.db && data.db.source || "").slice(0, 10))} 기준)</span></h2>
+      <h2>📚 미리 분석한 충돌·중복 <span class="meta">${esc(fields.join(" · "))} 법령 ${n(data.groups.length)}묶음 · ${n(all.length)}건 · 분석 ${esc(String(data.analyzedAt || "").slice(0, 10))} (자료 ${esc(String(data.db && data.db.source || "").slice(0, 10))} 기준)</span></h2>
       <p class="meta">Claude가 각 법령 묶음(법률·시행령·시행규칙)과 가장 많이 이어진 법령의 조문을 비교한 결과입니다. AI 분석 · 참고용 · 공식 해석이 아닙니다.</p>
       <div class="conf-row"><label class="vh" for="libQ">분석 결과에서 찾기</label><input id="libQ" type="search" value="${esc(LIB.q)}" placeholder="법령 이름이나 낱말로 찾기 (예: 공유재산, 사용허가)">
         ${lawName ? `<span class="filter-chip chosen"><button type="button">${esc(lawName)}</button><button type="button" class="chip-x" id="libLawX" aria-label="법령 거르기 풀기">×</button></span>` : ""}
+        ${fields.length > 1 ? `<select id="libField" aria-label="분야"><option value="">모든 분야</option>${fields.map((x) => `<option ${x === LIB.field ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>` : ""}
         <select id="libType" aria-label="종류"><option value="">모든 종류</option>${types.map((x) => `<option ${x === LIB.type ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></div>
       <div class="sev-filter" role="group" aria-label="심각도"><button type="button" data-lsev="" aria-pressed="${!LIB.sev}">전체 ${n(all.length)}</button>
         ${["high", "medium", "low"].map((s) => `<button type="button" class="sev-${s}" data-lsev="${s}" aria-pressed="${LIB.sev === s}"><span class="sev-dot" style="background:var(--sv)"></span>${SEV_LABEL[s]} ${n(counts[s])}</button>`).join("")}</div>
@@ -3577,13 +3827,14 @@ async function renderLibrary() {
       const L = S.byMst.get(g.main), c = {high: 0, medium: 0, low: 0};
       items.forEach((it) => c[it.severity]++);
       return `<details class="panel lib-group" ${gi < 3 || qc || LIB.law ? "open" : ""}><summary>
-          ${L ? typeBadge(lawType(L)) : ""} <b>${esc(L ? L.title : g.main)}</b>
+          ${L ? typeBadge(lawType(L)) : ""} <b>${esc(g.title || (L ? L.title : g.main))}</b> ${fields.length > 1 ? `<span class="meta">${esc(g.field || "지자체")}</span>` : ""}
           <span class="lib-counts">${["high", "medium", "low"].filter((s) => c[s]).map((s) => `<span class="sev-badge sev-${s}">${SEV_LABEL[s]} ${c[s]}</span>`).join(" ")}</span></summary>
         <div class="lib-body"><p class="meta">함께 본 법령: ${g.laws.filter((m) => S.byMst.has(m)).map((m) => `<button type="button" class="lib-law" data-lopen="${m}">${esc(S.byMst.get(m).title)}</button>`).join(" · ")}</p>
           ${g.summary ? `<p class="lib-sum">${esc(g.summary)}</p>` : ""}${items.map(libCard).join("")}</div></details>`;
     }).join("") : '<p class="empty">조건에 맞는 분석 결과가 없습니다.</p>');
   $("#libQ").oninput = (e) => { LIB.q = e.target.value; clearTimeout(LIB.t); LIB.t = setTimeout(() => { renderLibrary().then(() => { const q = $("#libQ"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }); }, 250); };
   $("#libType").onchange = (e) => { LIB.type = e.target.value; renderLibrary(); };
+  if ($("#libField")) $("#libField").onchange = (e) => { LIB.field = e.target.value; renderLibrary(); };
   if ($("#libLawX")) $("#libLawX").onclick = () => { LIB.law = ""; renderLibrary(); };
   box.querySelectorAll("[data-lsev]").forEach((b) => b.onclick = () => { LIB.sev = b.dataset.lsev; renderLibrary(); });
   box.querySelectorAll("[data-lopen]").forEach((b) => b.onclick = () => openLawWindow(b.dataset.lopen));
