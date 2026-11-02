@@ -197,11 +197,21 @@ button.filter-chip {padding:6px 14px;min-height:36px;font-size:14px;}
 .pick-names {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;}
 .workspace {display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:16px;align-items:start;}
 .workspace.list-only {grid-template-columns:minmax(0,1fr);}
+.upd-line {white-space:normal;}
+.upd-list {margin:0;padding-left:20px;display:grid;gap:4px;max-height:260px;overflow-y:auto;}
+.upd-hist {border-collapse:collapse;font-size:13px;width:100%;}
+.upd-hist th,.upd-hist td {border-bottom:1px solid var(--line);padding:4px 8px;text-align:left;}
 .gw {padding:22px 26px;display:grid;gap:12px;}
 /* the AI 질문 box: a chat whose messages scroll inside it, the question box at its bottom */
 @media (max-width:810px) { body.gw-open .scroll-btns {display:none;} }
 .gw-chat {display:flex;flex-direction:column;height:clamp(380px, calc(100dvh - var(--sticky-h,200px) - 76px), 820px);}
 .gw-bar b {white-space:nowrap;}
+.gw-login-note {font-size:13px;padding:6px 10px;border-radius:8px;background:color-mix(in srgb,#d97706 10%,transparent);display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;}
+.gw-login-must {margin:0;font-weight:600;}
+.gw-login-note[hidden] {display:none;}
+.gw-hours {font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;}
+.gw-hours.open {color:#15803d;background:color-mix(in srgb,#16a34a 12%,transparent);}
+.gw-hours.closed {color:#b91c1c;background:color-mix(in srgb,#dc2626 10%,transparent);}
 .gw-bar {display:flex;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--line);flex:none;}
 .gw-bar-btns {margin-left:auto;}
 .gw-msgs {flex:1;overflow-y:auto;overscroll-behavior:contain;padding:18px;display:flex;flex-direction:column;gap:14px;scroll-behavior:auto;}
@@ -1292,7 +1302,8 @@ const source = {pack: null};
 function urlOf(name) {
   const ref = source.pack && source.pack.files && source.pack.files[name];
   if (ref && ref.ref && ref.ref !== "base") return "/_blob/" + ref.ref;
-  return "data/" + name;
+  const f = name !== "index.png" && S.index && S.index.files && S.index.files[name];
+  return "data/" + name + (f && f.sha256 ? "?v=" + f.sha256.slice(0, 12) : "");
 }
 // Native inflate of the PNG's IDAT (rows: one filter byte 0 + RGB bytes) — several times faster
 // than drawing to a canvas; the canvas path stays for browsers without DecompressionStream.
@@ -1349,7 +1360,7 @@ async function decodePngCanvas(blob) {
 const cache = new Map();
 function load(name) {
   if (!cache.has(name)) {
-    const p = fetch(urlOf(name)).then((r) => { if (!r.ok) throw new Error(name + " " + r.status); return r.blob(); }).then(decodePng);
+    const p = fetch(urlOf(name), name === "index.png" ? {cache: "no-cache"} : undefined).then((r) => { if (!r.ok) throw new Error(name + " " + r.status); return r.blob(); }).then(decodePng);
     p.catch(() => cache.delete(name));
     cache.set(name, p);
   }
@@ -1527,6 +1538,62 @@ async function boot() {
   const canEdit = user ? await user.canEdit().catch(() => false) : false;
   if (canEdit && assets) { $("#updBtn").hidden = false; }
 }
+// What the weekly update changed. JG중앙통제 pushes the new data to the homepage's GitHub repository; the page
+// asks GitHub for the commits that changed data/index.png and compares the law list of the one before with the
+// list it shows (only when asked). Nothing is written to the repository, so the weekly push is never in the way.
+const GH_REPO = "Taea111/jg-law-web";
+const UPD = {commits: null, tried: false, diff: null};
+async function loadChanges() {
+  if (!PUBLIC || UPD.tried) return;
+  UPD.tried = true;
+  const cached = store.get("updCommits", null);
+  if (cached && Date.now() - cached.t < 30 * 60000 && cached.built === S.index.built) { UPD.commits = cached.list; renderNotice(); return; }
+  try {
+    const r = await fetch(`https://api.github.com/repos/${GH_REPO}/commits?path=data/index.png&per_page=12`, {headers: {Accept: "application/vnd.github+json"}});
+    if (!r.ok) return;
+    UPD.commits = (await r.json()).map((c) => ({sha: c.sha, at: (c.commit.committer && c.commit.committer.date) || c.commit.author.date,
+      msg: String(c.commit.message || "").split("\n")[0], who: c.commit.author && c.commit.author.name}));
+    store.set("updCommits", {t: Date.now(), built: S.index.built, list: UPD.commits});
+    renderNotice();
+  } catch (e) { /* GitHub not reachable: the dates above still show */ }
+}
+const updDay = (iso) => { const d = new Date(iso); return isNaN(d) ? String(iso || "").slice(0, 10) : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const updCount = (msg) => { const m = /변경\s*([\d,]+)\s*건/.exec(msg || ""); return m ? `변경 ${m[1]}건` : ""; };
+function lawChanges(oldIdx, newIdx) {
+  const byTitle = (idx) => new Map((idx.laws || []).map(([mst, title, kind, ministry, effective]) => [title, {mst, title, kind, ministry, effective}]));
+  const a = byTitle(oldIdx), b = byTitle(newIdx), out = {amended: [], added: [], removed: []};
+  for (const [t, x] of b) { const y = a.get(t); if (!y) out.added.push(x); else if (y.mst !== x.mst || y.effective !== x.effective) out.amended.push({...x, before: y.effective}); }
+  for (const [t, y] of a) if (!b.has(t)) out.removed.push(y);
+  for (const k of ["amended", "added", "removed"]) out[k].sort((x, y) => x.title.localeCompare(y.title, "ko"));
+  return out;
+}
+async function showUpdates() {
+  const c = UPD.commits || [];
+  if (!c.length) return;
+  const body = openDialog(`최근 업데이트 · ${updDay(c[0].at)}`, `<p class="meta">바뀐 법령을 찾는 중… (지난 업데이트의 법령 목록과 비교)</p>`);
+  if (!UPD.diff && c[1]) {
+    try {
+      const r = await fetch(`https://raw.githubusercontent.com/${GH_REPO}/${c[1].sha}/data/index.png`);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      UPD.diff = lawChanges(await decodePng(await r.blob()), S.index);
+    } catch (e) { UPD.diff = {error: e.message || String(e)}; }
+  }
+  if ($("#dlgTitle").textContent !== `최근 업데이트 · ${updDay(c[0].at)}`) return;
+  const d = UPD.diff;
+  const list = (rows, kind) => rows.length ? `<ul class="upd-list">${rows.slice(0, 400).map((x) => { const L = S.byMst.get(x.mst);
+    return `<li>${L ? `<button type="button" class="link-btn" data-updopen="${x.mst}">${esc(x.title)}</button>` : `<b>${esc(x.title)}</b>`}
+      <span class="meta">${esc([x.kind, x.ministry].filter(Boolean).join(" · "))}${kind === "amended" ? ` · 시행 ${esc(x.before || "-")} → ${esc(x.effective || "-")}` : x.effective ? ` · 시행 ${esc(x.effective)}` : ""}</span></li>`; }).join("")}
+      ${rows.length > 400 ? `<li class="meta">외 ${n(rows.length - 400)}건</li>` : ""}</ul>` : '<p class="meta">없음</p>';
+  body.innerHTML = `<p class="meta">${esc(c[0].msg)} · 현행 법령 ${n(S.index.counts.laws)}개. 법령은 JG중앙통제가 매주 국가법령정보센터 자료로 자동 업데이트합니다.</p>
+    ${!c[1] ? '<p class="meta">비교할 지난 업데이트가 없습니다.</p>' : d && d.error ? `<p class="error">지난 목록을 받지 못했습니다(${esc(d.error)}).</p>`
+      : `<p class="meta">${updDay(c[1].at)} 업데이트와 비교</p>
+    <h3>개정 ${n(d.amended.length)}</h3>${list(d.amended, "amended")}
+    <h3>새 법령 ${n(d.added.length)}</h3>${list(d.added, "added")}
+    <h3>폐지 ${n(d.removed.length)}</h3>${list(d.removed, "removed")}`}
+    <h3>지난 업데이트</h3><table class="upd-hist"><thead><tr><th>날짜</th><th>내용</th></tr></thead><tbody>${c.map((x) =>
+      `<tr><td>${esc(updDay(x.at))}</td><td>${esc(x.msg)}</td></tr>`).join("")}</tbody></table>`;
+  body.querySelectorAll("[data-updopen]").forEach((b) => b.onclick = () => openLawWindow(b.dataset.updopen));
+}
 async function loadIndex() {
   S.loading = "법령 목록 불러오는 중…"; renderNotice();
   try { S.index = await load("index.png"); }
@@ -1539,6 +1606,7 @@ async function loadIndex() {
   S.loading = "";
   showDates();
   byCompactTitle = null; plainLawRe = null; renderHeadCounts();
+  loadChanges();
   renderAll();
 }
 async function switchPack(next) {
@@ -1560,6 +1628,12 @@ function renderNotice() {
   if (S.loading) { el.innerHTML = S.loading; return; }
   if (!S.index) { el.textContent = ""; return; }
   el.textContent = `국가법령정보센터에서 받은 DB(자료 ${(S.index.source || S.index.built || "").slice(0, 10)} 기준 · DB 업데이트 ${updDate()})에서 찾습니다. 실제 업무에서는 원문과 적용 시행일을 반드시 확인하세요.`;
+  const u = UPD.commits && UPD.commits[0];
+  if (u) {
+    el.insertAdjacentHTML("beforeend", ` <span class="upd-line">· 최근 법령 업데이트 ${esc(updDay(u.at))}${updCount(u.msg) ? ` (${esc(updCount(u.msg))})` : ""}
+      <button type="button" class="ghost small" id="updShow">바뀐 법령 보기</button></span>`);
+    $("#updShow").onclick = showUpdates;
+  }
 }
 function renderSaved() {
   const el = $("#saved");
@@ -2719,11 +2793,13 @@ function guideHtml() {
       <li>선택한 법령은 <b>🕸 법령 연계도</b>의 가운데에도 놓입니다([🕸 연계도]로 바로 가기). [← 결과 목록]이나 ✕로 비교를 닫습니다.</li></ul>`)}
     ${sec("14. ★ 즐겨찾기", `<ul><li>결과 카드의 <b>☆</b>나 본문 위 [☆ 즐겨찾기]를 누르면 검색창 아래 <b>★ 즐겨찾기</b> 줄에 남습니다. 누르면 열리고, 두 번 누르면 선택(옆에 비교)되며, ×로 뺍니다.</li>
       <li>즐겨찾기는 <b>이 브라우저에만</b> 저장됩니다. 다른 컴퓨터·브라우저와 나누지 않으며, 인터넷 사용 기록에서 쿠키·사이트 데이터를 지우면 함께 지워집니다.</li></ul>`)}
-    ${GW.ready ? sec("15. 🤖 AI 질문 (회원)", `<ul><li>검색창 옆 <b>[🤖 AI에게 묻기]</b>나 오른쪽 <b>🤖 AI 질문</b> 탭에서 묻습니다. 처음 물을 때 <b>JG 회원 로그인</b> 창이 뜹니다(맨 위 [로그인]).</li>
+    ${GW.ready ? sec("15. 🤖 AI 질문 (회원)", `<ul><li><b>AI 질문은 JG 회원 로그인 후 사용할 수 있습니다.</b> 맨 위 [로그인]을 누르거나, 로그인하지 않고 질문하면 로그인 창이 뜹니다. 검색·법령 보기는 로그인 없이 됩니다.</li>
+      <li>검색창 옆 <b>[🤖 AI에게 묻기]</b>나 오른쪽 <b>🤖 AI 질문</b> 탭에서 묻습니다.</li>
       <li>열어 둔 법령·고른 법령·검색 결과에서 질문과 관련된 조문을 골라 AI에게 근거로 주고, 답의 <span class="ref-chip">[1]</span> 같은 번호를 누르면 그 조문이 창으로 뜹니다.</li>
       <li>답에 나온 <b>법령 이름</b>(예: 「건축법」, 공유재산 및 물품 관리법 제21조)을 누르면 그 법령이 창으로 뜨고, 조문 번호가 있으면 그 조문으로 갑니다.</li>
       <li>답 아래 칸에서 <b>이어서 물으면</b> 앞의 질문과 답(최근 4개)을 함께 보내 대화가 이어집니다. [새 대화]로 처음부터 다시 시작합니다.</li>
       <li><b>[법제처 실시간 검색]</b>은 받은 DB에 아직 없는 최신 법령·판례·해석례·행정규칙·자치법규를 국가법령정보센터에서 바로 찾습니다.</li>
+      <li><b>AI 사용 시간</b>: ${esc(gwHoursLabel())} (한국 시간, JG중앙통제에서 정함). 그 밖의 시간에는 AI 질문이 되지 않고, 검색은 언제나 됩니다.</li>
       <li>AI 답은 참고용이며 법적 효력이 없습니다. 반드시 원문과 시행일을 확인하세요.</li></ul>`) : ""}
     </div></div>`;
 }
@@ -3859,8 +3935,56 @@ async function loadSdk() {
     throw new Error(`${reach} · ` + tries.join(" / "));
   }
 }
+/* AI 사용 시간 (JG중앙통제에서 정한 시간, 한국 시간): the Gateway's own setting when it tells it (appInfo),
+   else ai-hours.json next to the page (written by tools/publish_site.py --ai-hours), else 월~금 08:00~19:00. */
+const GW_DAYS = ["일", "월", "화", "수", "목", "금", "토"];
+GW.hours = {days: [1, 2, 3, 4, 5], from: "08:00", to: "19:00", tz: "Asia/Seoul"};
+function gwHoursFrom(v, depth = 0) {
+  if (!v || typeof v !== "object" || depth > 4) return null;
+  const from = v.from || v.start || v.startTime || v.open, to = v.to || v.end || v.endTime || v.close;
+  let days = v.days || v.weekdays || v.dayOfWeek;
+  if (typeof from === "string" && typeof to === "string" && /^\d{1,2}:\d{2}/.test(from) && /^\d{1,2}:\d{2}/.test(to)) {
+    const names = {sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, 일: 0, 월: 1, 화: 2, 수: 3, 목: 4, 금: 5, 토: 6};
+    if (typeof days === "string") days = days.split(/[,\s]+/);
+    days = Array.isArray(days) ? days.map((d) => (typeof d === "number" ? d % 7 : names[String(d).slice(0, 3).toLowerCase()] ?? names[String(d)[0]])).filter((d) => d >= 0 && d <= 6) : [1, 2, 3, 4, 5];
+    return {days: days.length ? days : [1, 2, 3, 4, 5], from: from.slice(0, 5).padStart(5, "0"), to: to.slice(0, 5).padStart(5, "0"), tz: v.tz || v.timezone || "Asia/Seoul"};
+  }
+  for (const k of ["aiHours", "hours", "schedule", "usage", "availability", "allowedHours", "timeWindow", "window"]) { const h = gwHoursFrom(v[k], depth + 1); if (h) return h; }
+  return null;
+}
+async function gwLoadHours() {
+  try { const r = await fetch("ai-hours.json", {cache: "no-cache"}); if (r.ok) { const h = gwHoursFrom(await r.json()); if (h) GW.hours = h; } } catch (e) { /* the default */ }
+  try { if (window.JG && window.JG.isLoggedIn() && window.JG.ai.appInfo) { const h = gwHoursFrom(await window.JG.ai.appInfo()); if (h) GW.hours = h; } } catch (e) { /* not told */ }
+  gwHoursPaint();
+}
+function gwDaysLabel(days) {
+  const d = [...new Set(days)].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));  // 월 first
+  const run = d.length > 2 && d.every((x, i) => i === 0 || ((x + 6) % 7) === ((d[i - 1] + 6) % 7) + 1);
+  return d.length === 7 ? "매일" : run ? `${GW_DAYS[d[0]]}~${GW_DAYS[d[d.length - 1]]}` : d.map((x) => GW_DAYS[x]).join("·");
+}
+function gwHoursLabel() { const h = GW.hours; return `${gwDaysLabel(h.days)} ${h.from}~${h.to}`; }
+function gwOpenNow() {
+  const h = GW.hours;
+  try {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {timeZone: h.tz, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23"}).formatToParts(new Date()).map((x) => [x.type, x.value]));
+    const day = {Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6}[parts.weekday], now = `${parts.hour}:${parts.minute}`;
+    return h.days.includes(day) && now >= h.from && now < h.to;
+  } catch (e) { return true; }
+}
+function gwHoursHtml() {
+  const open = gwOpenNow();
+  return `<span class="gw-hours ${open ? "open" : "closed"}" title="JG중앙통제에서 정한 AI 사용 시간 (한국 시간)">🕘 AI 사용 시간 ${esc(gwHoursLabel())} · ${open ? "지금 사용 가능" : "지금은 사용 시간이 아닙니다"}</span>`;
+}
+function gwHoursPaint() {
+  document.querySelectorAll("[data-gwhours]").forEach((el) => { el.innerHTML = gwHoursHtml(); });
+  const open = gwOpenNow(), q = $("#gwQ");
+  if (q) q.placeholder = open ? "법령에 대해 물어보세요" : `지금은 AI 사용 시간이 아닙니다 (${gwHoursLabel()})`;
+  const b = $("#gwAskBtn"); if (b) b.title = `검색창의 질문을 JG AI에게 — 로그인 필요 · ${gwHoursLabel()}`;
+}
+setInterval(() => { if (GW.ready) gwHoursPaint(); }, 60000);
 function gwReady() {
   GW.ready = true; GW.failed = "";
+  gwLoadHours();
   $("#gwAskBtn").hidden = false; $("#gwLogin").hidden = false;
   gwLoginLabel();
   renderList(); renderReader();
@@ -3871,7 +3995,16 @@ function gwFailed(why) {
   b.hidden = false; b.textContent = "⚠ AI 연결 안 됨"; b.title = why;
   console.warn("JG Gateway:", why);
 }
-function gwLoginLabel() { const b = $("#gwLogin"); let on = false; try { on = window.JG.isLoggedIn(); } catch (e) { /* not yet */ } b.textContent = on ? "로그아웃" : "로그인"; b.title = on ? "JG 회원 로그아웃" : "JG 회원 로그인 (AI 질문)"; }
+function gwLoginLabel() {
+  const b = $("#gwLogin"); let on = false; try { on = window.JG.isLoggedIn(); } catch (e) { /* not yet */ }
+  b.textContent = on ? "로그아웃" : "로그인"; b.title = on ? "JG 회원 로그아웃" : "JG 회원 로그인 (AI 질문)";
+  const note = $("#gwLoginNote");
+  if (note) {
+    note.hidden = on;
+    note.innerHTML = on ? "" : `🔒 AI 질문은 <b>JG 회원 로그인</b> 후 사용할 수 있습니다. <button type="button" class="ghost small" id="gwLoginNow">로그인</button> <span class="meta">(질문을 보내면 로그인 창이 뜹니다)</span>`;
+    if ($("#gwLoginNow")) $("#gwLoginNow").onclick = () => $("#gwLogin").click();
+  }
+}
 $("#gwLogin").onclick = async () => {
   if (GW.failed) {
     openDialog("AI 연결 안 됨", `<p>JG Gateway에 연결하지 못했습니다. 검색은 그대로 쓸 수 있습니다.</p>
@@ -3886,7 +4019,7 @@ $("#gwLogin").onclick = async () => {
   const b = $("#gwLogin");
   try {
     if (window.JG.isLoggedIn()) await window.JG.logout();
-    else { b.textContent = "로그인 중…"; await window.JG.login(); }
+    else { b.textContent = "로그인 중…"; await window.JG.login(); gwLoadHours(); }
   } catch (e) { flash("로그인하지 못했습니다: " + gwError(e)); }
   gwLoginLabel();
 };
@@ -3908,6 +4041,7 @@ function gwDetail(e) {
 }
 function gwError(e) {
   const code = e && e.code;
+  if (code && /HOUR|SCHEDULE|TIME_WINDOW|OUTSIDE|CLOSED/i.test(code)) return `지금은 AI 사용 시간이 아닙니다 (${gwHoursLabel()}, 한국 시간). (코드 ${code})`;
   const base = (code && GW_ERRORS[code]) || (e && e.message) || "AI 답을 받지 못했습니다.";
   const d = gwDetail(e);
   return d && !base.includes(d) ? `${base} (${d})` : base;
@@ -3976,8 +4110,10 @@ function gwMsgsHtml() {
   if (GW.turns.length) return GW.turns.map(gwTurnHtml).join("");
   let on = false; try { on = window.JG.isLoggedIn(); } catch (e) { /* not ready */ }
   return `<div class="gw-hello"><div class="gw-hello-icon" aria-hidden="true">🤖</div><h2>무엇이든 물어보세요</h2>
-    <p class="meta">열어 둔 법령과 검색 결과에서 관련 조문을 골라 근거로 답하고, 대화를 이어서 기억합니다. 답의 [1]·법령 이름을 누르면 그 조문이 창으로 뜹니다.${on ? "" : " 처음 물을 때 JG 회원 로그인 창이 뜹니다."}</p>
+    ${on ? "" : `<p class="gw-login-must">🔒 AI 질문은 <b>JG 회원 로그인</b> 후 사용할 수 있습니다. (검색은 로그인 없이 됩니다)</p>`}
+    <p class="meta">열어 둔 법령과 검색 결과에서 관련 조문을 골라 근거로 답하고, 대화를 이어서 기억합니다. 답의 [1]·법령 이름을 누르면 그 조문이 창으로 뜹니다.</p>
     <div class="gw-suggest">${GW_SUGGEST.map((x, i) => `<button type="button" class="filter-chip" data-gwsug="${i}">${esc(x)}</button>`).join("")}</div>
+    <p data-gwhours>${gwHoursHtml()}</p>
     <p class="meta">AI 답은 참고용이며 법적 효력이 없습니다. 반드시 원문과 시행일을 확인하세요.</p></div>`;
 }
 function renderGw() {
@@ -3985,9 +4121,10 @@ function renderGw() {
   if (!box) return;
   if (!$("#gwChat")) {
     box.innerHTML = `<div class="gw-chat" id="gwChat">
-      <div class="gw-bar"><b>🤖 AI 질문</b> <span class="meta gw-who">JG AI · 회원 전용</span><span class="gw-bar-btns"><button type="button" class="ghost small" id="gwNew">＋ 새 대화</button></span></div>
+      <div class="gw-bar"><b>🤖 AI 질문</b> <span class="meta gw-who">JG AI · 회원 전용</span> <span data-gwhours>${gwHoursHtml()}</span><span class="gw-bar-btns"><button type="button" class="ghost small" id="gwNew">＋ 새 대화</button></span></div>
       <div class="gw-msgs" id="gwMsgs" tabindex="0" aria-live="polite" aria-label="대화"></div>
       <form class="gw-composer" id="gwForm">
+        <div class="gw-login-note" id="gwLoginNote" hidden></div>
         <div class="gw-input"><label class="vh" for="gwQ">질문</label>
           <textarea id="gwQ" rows="1" maxlength="600" placeholder="법령에 대해 물어보세요"></textarea>
           <button type="submit" class="primary gw-send" id="gwSend" aria-label="보내기" title="보내기 (Enter)">↑</button></div>
@@ -4007,6 +4144,7 @@ function renderGw() {
   }
   const m = $("#gwMsgs"), atEnd = m.scrollHeight - m.scrollTop - m.clientHeight < 140;
   m.innerHTML = gwMsgsHtml();
+  gwHoursPaint(); gwLoginLabel();
   m.querySelectorAll("[data-gwsug]").forEach((b) => b.onclick = () => { $("#gwQ").value = GW.q = GW_SUGGEST[+b.dataset.gwsug]; gwAsk(); });
   $("#gwSend").disabled = GW.busy; $("#gwNew").disabled = GW.busy || !GW.turns.length;
   bindGwRefs(m);
