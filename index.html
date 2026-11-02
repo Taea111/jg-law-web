@@ -3737,24 +3737,57 @@ async function renderSideCmp() {
 // On the public page at law.jg.it.kr only: the JG Gateway (api.jg.it.kr) answers with members' login.
 // tae-ai-client.js (the Gateway's SDK) and jg-connect.js (this app's connection, no keys in it) load
 // after the page; anywhere else (the claude.ai artifact, github.io) nothing loads and nothing shows.
-const GW = {ready: false, q: "", busy: false, answer: "", sources: [], error: "", live: null, liveTarget: "law"};
-const GW_HOSTS = ["law.jg.it.kr"];
+const GW = {ready: false, failed: "", q: "", busy: false, answer: "", sources: [], error: "", live: null, liveTarget: "law"};
+const GW_SDK = "https://api.jg.it.kr/sdk/tae-ai-client.js";
+// law.jg.it.kr (and www.), or any address with ?gw=1 for a test (the Gateway itself still checks the Origin).
+const GW_ON = PUBLIC && (/(^|\.)law\.jg\.it\.kr$/.test(location.hostname) || /[?&]gw=1\b/.test(location.search));
 function loadScript(src) {
-  return new Promise((ok, no) => { const t = document.createElement("script"); t.src = src; t.async = true; t.onload = ok; t.onerror = () => no(new Error(src)); document.head.appendChild(t); });
+  return new Promise((ok, no) => {
+    const t = document.createElement("script"); t.src = src; t.async = true;
+    t.onload = ok; t.onerror = () => no(new Error(`${src} 파일을 불러오지 못했습니다(주소·네트워크·차단 확인).`));
+    document.head.appendChild(t);
+  });
 }
-if (PUBLIC && GW_HOSTS.includes(location.hostname)) {
-  loadScript("https://api.jg.it.kr/sdk/tae-ai-client.js").then(() => loadScript("jg-connect.js"))
-    .then(() => { if (window.JG && window.JG.ai) gwReady(); }).catch(() => { /* search keeps working without the Gateway */ });
+if (GW_ON) {
+  // The login button shows at once: "AI 연결 중…", then 로그인 — or, when something fails, why.
+  $("#gwLogin").hidden = false; $("#gwLogin").textContent = "AI 연결 중…";
+  let scriptError = "";
+  const onErr = (e) => { if (/tae-ai-client|jg-connect/.test(e.filename || "")) scriptError = e.message || "스크립트 오류"; };
+  window.addEventListener("error", onErr);
+  loadScript(GW_SDK + "?v=" + Math.floor(Date.now() / 3600000))
+    .then(() => { if (typeof window.TaeAI !== "function") throw new Error("tae-ai-client.js를 불러왔지만 TaeAI가 없습니다(SDK 버전 확인, v1.2 이상)."); })
+    .then(() => loadScript("jg-connect.js?v=" + Math.floor(Date.now() / 3600000)))
+    .then(() => { if (!(window.JG && window.JG.ai)) throw new Error("jg-connect.js 실행 오류: " + (scriptError || "JG가 만들어지지 않았습니다.")); gwReady(); })
+    .catch((e) => gwFailed(e && e.message || String(e)))
+    .finally(() => window.removeEventListener("error", onErr));
 }
 function gwReady() {
-  GW.ready = true;
+  GW.ready = true; GW.failed = "";
   $("#gwAskBtn").hidden = false; $("#gwLogin").hidden = false;
   gwLoginLabel();
   renderList(); renderReader();
 }
-function gwLoginLabel() { const b = $("#gwLogin"); let on = false; try { on = window.JG.isLoggedIn(); } catch (e) { /* not yet */ } b.textContent = on ? "로그아웃" : "로그인"; }
+function gwFailed(why) {
+  GW.failed = why;
+  const b = $("#gwLogin");
+  b.hidden = false; b.textContent = "⚠ AI 연결 안 됨"; b.title = why;
+  console.warn("JG Gateway:", why);
+}
+function gwLoginLabel() { const b = $("#gwLogin"); let on = false; try { on = window.JG.isLoggedIn(); } catch (e) { /* not yet */ } b.textContent = on ? "로그아웃" : "로그인"; b.title = on ? "JG 회원 로그아웃" : "JG 회원 로그인 (AI 질문)"; }
 $("#gwLogin").onclick = async () => {
-  try { if (window.JG.isLoggedIn()) await window.JG.logout(); else await window.JG.login(); } catch (e) { /* closed the window */ }
+  if (GW.failed) {
+    openDialog("AI 연결 안 됨", `<p>JG Gateway에 연결하지 못했습니다. 검색은 그대로 쓸 수 있습니다.</p>
+      <p class="error">${esc(GW.failed)}</p>
+      <ul><li>새로고침(Ctrl+F5)을 해 보세요.</li><li>회사·학교 네트워크나 광고 차단 확장이 <span class="mono">api.jg.it.kr</span>을 막는지 확인하세요.</li>
+      <li>Gateway(Mac mini)가 켜져 있는지, 관리자 화면에서 이 앱의 허용 Origin이 <span class="mono">https://law.jg.it.kr</span>인지 확인하세요.</li></ul>`);
+    return;
+  }
+  if (!GW.ready) return;
+  const b = $("#gwLogin");
+  try {
+    if (window.JG.isLoggedIn()) await window.JG.logout();
+    else { b.textContent = "로그인 중…"; await window.JG.login(); }
+  } catch (e) { flash("로그인하지 못했습니다: " + gwError(e)); }
   gwLoginLabel();
 };
 $("#gwAskBtn").onclick = () => openGw($("#q").value.trim());
