@@ -91,7 +91,7 @@ a {color:var(--brand);}
 /* 법령 창 (연계도) */
 .lw-head {margin-bottom:4px;}
 .lw-actions {display:flex;flex-wrap:wrap;gap:8px;}
-.lw-find {top:0 !important;margin:0 !important;}
+dialog .law-find.lw-find {top:var(--lw-top,62px) !important;margin:0 -22px !important;padding:10px 22px !important;z-index:1 !important;box-shadow:0 6px 10px -10px #0005;}
 .lw-arts .reading-article {margin-bottom:18px;}
 /* 📑 법령 비교 */
 .cmp-pick {padding:14px 16px;display:grid;gap:10px;margin-bottom:14px;}
@@ -3630,6 +3630,8 @@ async function openLawWindow(mst, target = null, back = false) {
   if ($("#lwCenter")) $("#lwCenter").onclick = () => { $("#dlg").close(); $("#gCenter").value = L.title; buildGraph(mst); };
   $("#lwCmp").onclick = (e) => { addCompare(mst); e.target.textContent = "비교에 넣었습니다"; };
   if ($("#lwBack")) $("#lwBack").onclick = () => openLawWindow(LW.stack.pop(), null, true);
+  // The find box stays right under the law's name (the window's head) while the articles scroll.
+  $("#dlg").style.setProperty("--lw-top", $("#dlg .box-head").offsetHeight + "px");
   bindFavBtns(body);
   draw();
   if (target != null) {
