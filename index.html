@@ -204,6 +204,10 @@ button.filter-chip {padding:6px 14px;min-height:36px;font-size:14px;}
 .gw-live {display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
 .gw-live select {min-height:36px;border:1px solid var(--line);border-radius:8px;background:var(--surface-100);color:var(--ink);padding:4px 8px;}
 .gw-answer {white-space:pre-wrap;line-height:1.8;}
+.gw-thread {display:grid;gap:14px;}
+.gw-thread:empty {display:none;}
+.gw-turn {border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:8px;background:var(--surface-100);}
+.gw-q {margin:0;padding:8px 12px;border-radius:10px;background:var(--surface-200);}
 .gw-answer:empty {display:none;}
 .gw-src ol {margin:6px 0 0;padding-left:22px;}
 .link-btn {border:0;background:none;padding:0;color:var(--brand);text-decoration:underline;cursor:pointer;font:inherit;text-align:left;}
@@ -1499,7 +1503,7 @@ async function loadIndex() {
   S.selected = S.selected.filter((m) => S.byMst.has(m));
   S.loading = "";
   showDates();
-  byCompactTitle = null; renderHeadCounts();
+  byCompactTitle = null; plainLawRe = null; renderHeadCounts();
   renderAll();
 }
 async function switchPack(next) {
@@ -2681,6 +2685,8 @@ function guideHtml() {
       <li>즐겨찾기는 <b>이 브라우저에만</b> 저장됩니다. 다른 컴퓨터·브라우저와 나누지 않으며, 인터넷 사용 기록에서 쿠키·사이트 데이터를 지우면 함께 지워집니다.</li></ul>`)}
     ${GW.ready ? sec("15. 🤖 AI 질문 (회원)", `<ul><li>검색창 옆 <b>[🤖 AI에게 묻기]</b>나 오른쪽 <b>🤖 AI 질문</b> 탭에서 묻습니다. 처음 물을 때 <b>JG 회원 로그인</b> 창이 뜹니다(맨 위 [로그인]).</li>
       <li>열어 둔 법령·고른 법령·검색 결과에서 질문과 관련된 조문을 골라 AI에게 근거로 주고, 답의 <span class="ref-chip">[1]</span> 같은 번호를 누르면 그 조문이 창으로 뜹니다.</li>
+      <li>답에 나온 <b>법령 이름</b>(예: 「건축법」, 공유재산 및 물품 관리법 제21조)을 누르면 그 법령이 창으로 뜨고, 조문 번호가 있으면 그 조문으로 갑니다.</li>
+      <li>답 아래 칸에서 <b>이어서 물으면</b> 앞의 질문과 답(최근 4개)을 함께 보내 대화가 이어집니다. [새 대화]로 처음부터 다시 시작합니다.</li>
       <li><b>[법제처 실시간 검색]</b>은 받은 DB에 아직 없는 최신 법령·판례·해석례·행정규칙·자치법규를 국가법령정보센터에서 바로 찾습니다.</li>
       <li>AI 답은 참고용이며 법적 효력이 없습니다. 반드시 원문과 시행일을 확인하세요.</li></ul>`) : ""}
     </div></div>`;
@@ -3672,6 +3678,21 @@ function lawLinks(html, self = null) {
     return `<button type="button" class="law-ref" data-ref="${L.mst}"${art ? ` data-art="${art.trim()}"` : ""} title="${esc(L.title)} — 눌러서 창으로 보기">${all}</button>`;
   });
 }
+// 「법령명」 and the plain names of the laws in the DB (공유재산 및 물품 관리법 제21조), in one pass.
+let plainLawRe = null;
+function lawLinksAll(html) {
+  if (!plainLawRe) {
+    const names = [...new Set(S.laws.map((L) => L.title))].filter((t) => t.length >= 3).sort((a, b) => b.length - a.length)
+      .map((t) => esc(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    plainLawRe = new RegExp(`「((?:(?!」).){2,160}?)」(\\s*제\\d+조(?:의\\d+)?)?|(${names.join("|")})(\\s*제\\d+조(?:의\\d+)?)?`, "g");
+  }
+  return html.replace(plainLawRe, (all, inner, art1, plain, art2) => {
+    const L = lawByName((inner != null ? inner : plain).replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"'));
+    const art = inner != null ? art1 : art2;
+    if (!L) return all;
+    return `<button type="button" class="law-ref" data-ref="${L.mst}"${art ? ` data-art="${art.trim()}"` : ""} title="${esc(L.title)} — 눌러서 창으로 보기">${all}</button>`;
+  });
+}
 document.addEventListener("click", (e) => {
   const b = e.target.closest && e.target.closest(".law-ref");
   if (!b) return;
@@ -3737,7 +3758,8 @@ async function renderSideCmp() {
 // On the public page at law.jg.it.kr only: the JG Gateway (api.jg.it.kr) answers with members' login.
 // tae-ai-client.js (the Gateway's SDK) and jg-connect.js (this app's connection, no keys in it) load
 // after the page; anywhere else (the claude.ai artifact, github.io) nothing loads and nothing shows.
-const GW = {ready: false, failed: "", q: "", busy: false, answer: "", sources: [], error: "", live: null, liveTarget: "law"};
+const GW = {ready: false, failed: "", q: "", busy: false, turns: [], error: "", live: null, liveTarget: "law"};
+const GW_KEEP = 4;  // earlier questions and answers sent along with a new question
 const GW_SDK = "https://api.jg.it.kr/sdk/tae-ai-client.js";
 // law.jg.it.kr (and www.), or any address with ?gw=1 for a test (the Gateway itself still checks the Origin).
 const GW_ON = PUBLIC && (/(^|\.)law\.jg\.it\.kr$/.test(location.hostname) || /[?&]gw=1\b/.test(location.search));
@@ -3825,16 +3847,30 @@ const GW_ERRORS = {APP_PERMISSION_DENIED: "이 계정은 JG법령검색 AI를 �
   LOGIN_REQUIRED: "로그인이 필요합니다. 맨 위 [로그인]을 누르세요.", UNAUTHORIZED: "로그인이 필요합니다. 맨 위 [로그인]을 누르세요."};
 function gwError(e) { const code = e && e.code; return (code && GW_ERRORS[code]) || (e && e.message) || "AI 답을 받지 못했습니다. 잠시 뒤 다시 해 보세요."; }
 // The articles the answer may rest on: the open law, the chosen laws, then the laws found for the question.
-async function gwSources(q) {
-  const words = q.split(/\s+/).map(compact).filter((w) => w.length >= 2);
+// The words of a question, without 은·는·을·를… and punctuation (기간은? -> 기간).
+function gwWords(q) {
+  return [...new Set(q.split(/\s+/).map((w) => w.replace(/[^0-9A-Za-z가-힣]/g, ""))
+    .map((w) => (w.length > 2 ? w.replace(/(에서|으로|에게|까지|부터|이나|이란|은|는|이|가|을|를|의|에|로|과|와|도|만|요)$/, "") : w))
+    .filter((w) => w.length >= 2 && !/^(그럼|그러면|그리고|어떻게|무엇|뭐|언제|얼마|얼마나|있나|있나요|하나요|되나요|알려줘|알려주세요|대해|관련)$/.test(w)))];
+}
+async function gwSources(q, prefer = []) {
+  const words = gwWords(q).map(compact);
   const laws = [];
   const add = (m) => { if (m && S.byMst.has(m) && !laws.includes(m)) laws.push(m); };
+  prefer.slice(0, 3).forEach(add);  // a follow-up: the laws the conversation is about
   if (S.chosen && S.chosen.type === "law") add(S.chosen.id);
   S.selected.forEach(add); [...S.picked.keys()].forEach(add);
   for (const it of S.results) if (it.type === "law" && laws.length < 4) add(it.mst);
-  if (laws.length < 3) {
-    const cand = await candidateMsts(q);
-    if (cand) rankLaws(q, [...cand].map((m) => S.byMst.get(m)).filter(Boolean)).slice(0, 4).forEach((L) => laws.length < 5 && add(L.mst));
+  if (laws.length < 3 && words.length) {
+    // Laws with the most of the words in their articles (word index), a word in the name counting more.
+    const score = new Map();
+    for (const w of words) {
+      const cand = await candidateMsts(w);
+      if (cand) for (const m of cand) score.set(m, (score.get(m) || 0) + 1);
+      for (const L of S.laws) if (compact(L.title).includes(w)) score.set(L.mst, (score.get(L.mst) || 0) + 3);
+    }
+    [...score].map(([m, v]) => [S.byMst.get(m), v]).filter(([L]) => L)
+      .sort((a, b) => b[1] - a[1] || a[0].level - b[0].level || b[0].local - a[0].local).slice(0, 4).forEach(([L]) => laws.length < 5 && add(L.mst));
   }
   const out = [];
   for (const mst of laws.slice(0, 5)) {
@@ -3851,54 +3887,84 @@ async function gwSources(q) {
   }
   return out.slice(0, 14);
 }
-function gwAnswerHtml(text, sources) {
-  return esc(text).replace(/\[(\d{1,2})\]/g, (m, k) => { const src = sources[+k - 1];
-    return src ? `<button type="button" class="ref-chip" data-gwref="${+k - 1}" title="${esc(src.title)}">[${k}]</button>` : m; });
+function gwAnswerHtml(text, sources, turn, done = true) {
+  // Law names in the answer open the law in a window: 「법령명」 always, plain names once the answer is complete.
+  const linked = done ? lawLinksAll(esc(text)) : lawLinks(esc(text));
+  return linked.replace(/\[(\d{1,2})\]/g, (m, k) => { const src = sources[+k - 1];
+    return src ? `<button type="button" class="ref-chip" data-gwturn="${turn}" data-gwref="${+k - 1}" title="${esc(src.title)}">[${k}]</button>` : m; });
+}
+function gwTurnHtml(t, k) {
+  return `<div class="gw-turn" id="gwTurn${k}"><p class="gw-q"><b>Q.</b> ${esc(t.q)}</p>
+    <div class="gw-answer">${t.answer ? gwAnswerHtml(t.answer, t.sources, k, t.done) : t.error ? "" : '<span class="meta">답을 받는 중…</span>'}</div>
+    ${t.error ? `<p class="error" role="alert">${esc(t.error)}</p>` : ""}
+    ${t.sources.length ? `<details class="gw-src"><summary>근거로 준 조문 ${t.sources.length}개</summary><ol>${t.sources.map((x, i) => `<li><button type="button" class="link-btn" data-gwturn="${k}" data-gwref="${i}">${esc(x.title)}</button></li>`).join("")}</ol></details>` : ""}</div>`;
 }
 function renderGw() {
   const box = $("#gwView");
   if (!box) return;
   let on = false; try { on = window.JG.isLoggedIn(); } catch (e) { /* not ready */ }
+  const more = GW.turns.length > 0;
   box.innerHTML = `<div class="gw"><div class="nb-top"><div><h2>🤖 AI에게 묻기</h2>
-      <p class="meta">열어 둔 법령과 검색 결과에서 질문과 관련된 조문을 골라 근거로 답합니다(JG AI · 회원 전용${on ? "" : " · 처음 물을 때 로그인 창이 뜹니다"}). AI 답은 참고용이며 법적 효력이 없습니다.</p></div></div>
-    <label class="vh" for="gwQ">질문</label><textarea id="gwQ" rows="3" maxlength="600" placeholder="예: 공유재산 사용허가 기간은 얼마까지 할 수 있나요?">${esc(GW.q)}</textarea>
-    <div class="gw-btns"><button type="button" class="primary small" id="gwSend" ${GW.busy ? "disabled" : ""}>${GW.busy ? "답을 받는 중…" : "질문하기"}</button>
+      <p class="meta">열어 둔 법령과 검색 결과에서 질문과 관련된 조문을 골라 근거로 답하고, 앞의 대화(최근 ${GW_KEEP}개)를 이어서 기억합니다(JG AI · 회원 전용${on ? "" : " · 처음 물을 때 로그인 창이 뜹니다"}). AI 답은 참고용이며 법적 효력이 없습니다.</p></div>
+      ${more ? `<button type="button" class="ghost small" id="gwNew" ${GW.busy ? "disabled" : ""}>새 대화</button>` : ""}</div>
+    <div class="gw-thread" id="gwThread" aria-live="polite">${GW.turns.map(gwTurnHtml).join("")}</div>
+    <label class="vh" for="gwQ">${more ? "이어서 묻기" : "질문"}</label><textarea id="gwQ" rows="3" maxlength="600" placeholder="${more ? "이어서 묻기 (예: 그럼 기간을 연장하려면?) · Enter 보내기, Shift+Enter 줄바꿈" : "예: 공유재산 사용허가 기간은 얼마까지 할 수 있나요?"}">${esc(GW.q)}</textarea>
+    <div class="gw-btns"><button type="button" class="primary small" id="gwSend" ${GW.busy ? "disabled" : ""}>${GW.busy ? "답을 받는 중…" : more ? "이어서 묻기" : "질문하기"}</button>
       <span class="gw-live"><label class="vh" for="gwTarget">찾을 자료</label><select id="gwTarget">${["law", "prec", "expc", "admrul", "ordin"].map((k) => `<option value="${k}" ${GW.liveTarget === k ? "selected" : ""}>${LABEL[k]}</option>`).join("")}</select>
       <button type="button" class="ghost small" id="gwLive" title="받은 DB에 없는 최신 자료를 국가법령정보센터에서 바로 찾기">법제처 실시간 검색</button></span></div>
     ${GW.error ? `<p class="error" role="alert">${esc(GW.error)}</p>` : ""}
-    <div class="gw-answer" id="gwAnswer" aria-live="polite">${GW.answer ? gwAnswerHtml(GW.answer, GW.sources) : ""}</div>
-    ${GW.sources.length ? `<details class="gw-src"><summary>근거로 준 조문 ${GW.sources.length}개</summary><ol>${GW.sources.map((x, k) => `<li><button type="button" class="link-btn" data-gwref="${k}">${esc(x.title)}</button></li>`).join("")}</ol></details>` : ""}
     <div id="gwLiveOut">${gwLiveHtml()}</div></div>`;
   const q = $("#gwQ");
   q.oninput = () => { GW.q = q.value; };
   q.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); gwAsk(); } };
   $("#gwSend").onclick = gwAsk;
+  if ($("#gwNew")) $("#gwNew").onclick = () => { GW.turns = []; GW.q = ""; GW.error = ""; renderGw(); $("#gwQ").focus(); };
   $("#gwTarget").onchange = (e) => { GW.liveTarget = e.target.value; };
   $("#gwLive").onclick = gwLive;
   bindGwRefs(box);
 }
 function bindGwRefs(root) {
-  root.querySelectorAll("[data-gwref]").forEach((b) => b.onclick = () => { const x = GW.sources[+b.dataset.gwref]; if (x) openLawWindow(x.mst, x.i); });
+  root.querySelectorAll("[data-gwref]").forEach((b) => b.onclick = () => {
+    const t = GW.turns[+b.dataset.gwturn], x = t && t.sources[+b.dataset.gwref];
+    if (x) openLawWindow(x.mst, x.i);
+  });
 }
+// A follow-up goes with the earlier questions and answers (the AI keeps no memory between calls),
+// and its articles are looked for with the previous question too ("그럼 연장은?" alone finds little).
 async function gwAsk() {
-  const q = (GW.q = ($("#gwQ") ? $("#gwQ").value : GW.q).trim());
+  const q = (($("#gwQ") ? $("#gwQ").value : GW.q) || "").trim();
   if (!q || GW.busy) return;
-  GW.busy = true; GW.error = ""; GW.answer = ""; GW.sources = [];
+  const prior = GW.turns.filter((t) => t.answer && !t.error).slice(-GW_KEEP);
+  const turn = {q, answer: "", sources: [], error: ""};
+  const k = GW.turns.push(turn) - 1;
+  GW.q = ""; GW.busy = true; GW.error = "";
   renderGw();
+  const scroll = () => { const el = document.getElementById("gwTurn" + k); if (el) el.scrollIntoView({block: "nearest"}); };
+  scroll();
   try {
-    const sources = await gwSources(q);
-    GW.sources = sources;
-    renderGw();
-    const paint = (acc) => { GW.answer = String(acc || ""); const a = $("#gwAnswer"); if (a) { a.innerHTML = gwAnswerHtml(GW.answer, GW.sources); bindGwRefs(a); } };
-    const res = sources.length
-      ? await window.JG.askWithSources(q, sources.map((x) => ({title: x.title, text: x.text})), (delta, acc) => paint(acc))
-      : await window.JG.askStream(q, (delta, acc) => paint(acc));
+    const last = prior[prior.length - 1];
+    turn.sources = await gwSources(last ? `${last.q} ${q}` : q, last ? [...new Set(last.sources.map((x) => x.mst))] : []);
+    renderGw(); scroll();
+    const text = prior.length
+      ? `[이전 대화]\n${prior.map((t) => `질문: ${t.q}\n답: ${t.answer.slice(0, 900)}`).join("\n\n")}\n\n[이번 질문 — 위 대화에 이어서 답하세요]\n${q}`
+      : q;
+    const paint = (acc) => {
+      turn.answer = String(acc || "");
+      const a = document.querySelector(`#gwTurn${k} .gw-answer`);
+      if (a) { a.innerHTML = gwAnswerHtml(turn.answer, turn.sources, k, false); bindGwRefs(a); }
+    };
+    const res = turn.sources.length
+      ? await window.JG.askWithSources(text, turn.sources.map((x) => ({title: x.title, text: x.text})), (delta, acc) => paint(acc))
+      : await window.JG.askStream(text, (delta, acc) => paint(acc));
     const final = typeof res === "string" ? res : res && (res.text || res.answer || res.content);
-    if (final) GW.answer = String(final);
-  } catch (e) { GW.error = gwError(e); }
+    if (final) turn.answer = String(final);
+    if (!turn.answer) turn.error = "빈 답이 왔습니다. 다시 물어보세요.";
+  } catch (e) { turn.error = gwError(e); }
+  turn.done = true;
   GW.busy = false;
   gwLoginLabel();
   renderGw();
+  requestAnimationFrame(() => { scroll(); const t = $("#gwQ"); if (t) t.focus({preventScroll: true}); });
 }
 // 법제처 실시간 검색: the Gateway asks 국가법령정보센터 (key kept on the Gateway); results not yet in the DB.
 async function gwLive() {
