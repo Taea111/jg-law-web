@@ -197,6 +197,19 @@ button.filter-chip {padding:6px 14px;min-height:36px;font-size:14px;}
 .pick-names {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;}
 .workspace {display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:16px;align-items:start;}
 .workspace.list-only {grid-template-columns:minmax(0,1fr);}
+.gw {padding:22px 26px;display:grid;gap:12px;}
+.gw h2 {margin:0 0 4px;font-size:20px;}
+.gw textarea {width:100%;min-height:84px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-100);color:var(--ink);font:inherit;resize:vertical;}
+.gw-btns {display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;}
+.gw-live {display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.gw-live select {min-height:36px;border:1px solid var(--line);border-radius:8px;background:var(--surface-100);color:var(--ink);padding:4px 8px;}
+.gw-answer {white-space:pre-wrap;line-height:1.8;}
+.gw-answer:empty {display:none;}
+.gw-src ol {margin:6px 0 0;padding-left:22px;}
+.link-btn {border:0;background:none;padding:0;color:var(--brand);text-decoration:underline;cursor:pointer;font:inherit;text-align:left;}
+.gw-live-out h3 {font-size:16px;margin:8px 0;}
+.gw-live-out ul {list-style:none;margin:0;padding:0;display:grid;gap:8px;}
+.gw-live-out li {border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;}
 .case-find {display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:10px;}
 .case-find input {flex:1 1 180px;min-width:0;}
 .case-find .bar {display:inline-block;vertical-align:middle;}
@@ -474,6 +487,7 @@ kbd {font-family:var(--font-sans);font-size:12px;color:var(--ink-muted);border:1
     <button type="button" class="ghost small" id="guideBtn">📘 설명서</button>
     <button type="button" class="ghost small" id="keysBtn" title="F1">단축키</button>
     <button type="button" class="secondary small ai-only" id="updBtn" hidden>DB 업데이트</button>
+    <button type="button" class="secondary small gw-only" id="gwLogin" hidden>로그인</button>
     <button type="button" class="secondary small" id="settingsBtn">설정</button>
   </div>
 </div></header>
@@ -492,6 +506,7 @@ kbd {font-family:var(--font-sans);font-size:12px;color:var(--ink-muted);border:1
     <input id="q" type="search" autocomplete="off" maxlength="120" placeholder="법령 이름·낱말로 검색, 또는 질문을 쓰고 [Claude에게 묻기]" autofocus>
     <button type="button" class="ghost save-search" id="saveBtn" aria-label="검색어 저장" title="검색어 저장 (Ctrl+S) — 법령 즐겨찾기는 결과·본문의 ☆" disabled>🔖</button>
     <button type="submit" class="primary">검색</button>
+    <button type="button" class="secondary nb-open gw-only" id="gwAskBtn" hidden title="검색창의 질문을 JG AI에게 (회원)">🤖 AI에게 묻기</button>
     <button type="button" class="secondary nb-open ai-only" id="askBtn" title="검색창의 질문을 Claude에게 (Ctrl+Enter)">🤖 Claude에게 묻기</button>
     <button type="button" class="secondary nb-open ai-only" id="nbBtn" title="체크한 법령으로 Claude에게 묻기 (Ctrl+B)">📓 노트북</button>
   </form>
@@ -1807,7 +1822,9 @@ function renderList() {
   const title = S.selected.length ? "선택한 법령" : mixed ? "관련 법령·자치법규" : S.results.length && S.results[0].type === "law" ? (S.kind === "all" ? "관련 법령" : "법령") : "결과";
   $("#listTitle").innerHTML = `${title} <span>${S.results.length ? n(S.results.length) : ""}</span>
     ${S.results.length && !S.listOnly && S.chosen ? `<button type="button" class="ghost small list-wide" id="listWide" title="본문을 닫고 결과만 넓게 보기">⤢ 결과만 보기</button>` : ""}
-    ${S.listOnly && !PUBLIC && S.results.length ? `<button type="button" class="ghost small list-wide" id="listAi">🤖 Claude · AI 요약 열기</button>` : ""}`;
+    ${S.listOnly && !PUBLIC && S.results.length ? `<button type="button" class="ghost small list-wide" id="listAi">🤖 Claude · AI 요약 열기</button>` : ""}
+    ${S.listOnly && GW.ready && S.results.length ? `<button type="button" class="ghost small list-wide" id="listGw">🤖 AI에게 묻기</button>` : ""}`;
+  if ($("#listGw")) $("#listGw").onclick = () => openGw(S.query);
   if ($("#listAi")) $("#listAi").onclick = () => { S.listOnly = false; S.rightTab = S.query ? "ai" : "ask"; renderList(); renderReader(); };
   if ($("#listWide")) $("#listWide").onclick = () => { S.listOnly = true; S.rightTab = "doc"; renderList(); renderReader(); };
   if (!S.results.length) {
@@ -1975,14 +1992,17 @@ function renderReader() {
     ${PUBLIC ? "" : `<button type="button" role="tab" data-rt="ask" aria-selected="${S.rightTab === "ask"}">🤖 Claude에게 묻기</button>`}
     ${showNb ? `<button type="button" role="tab" data-rt="notebook" aria-selected="${S.rightTab === "notebook"}">📓 노트북 (${nb.length})</button>` : ""}
     ${showAi ? `<button type="button" role="tab" data-rt="ai" aria-selected="${S.rightTab === "ai"}">🤖 AI 요약</button>` : ""}
+    ${GW.ready ? `<button type="button" role="tab" data-rt="gw" aria-selected="${S.rightTab === "gw"}">🤖 AI 질문</button>` : ""}
     ${S.chosen ? `<button type="button" role="tab" data-rt="doc" aria-selected="${S.rightTab === "doc"}">📄 ${esc(docTitle)}</button>` : ""}</nav>`; }
   el.classList.toggle("reader-law", !!L && S.rightTab === "doc");
   if (S.listOnly && S.rightTab === "doc" && !S.chosen) { el.innerHTML = tabs; bindTabs(); return; }  // hidden: only the results show
   if (S.rightTab === "guide") { el.innerHTML = tabs + guideHtml(); bindTabs(); bindGuide(); return; }
   if (showNb && S.rightTab === "notebook") { el.innerHTML = tabs + `<div id="nbView"></div>`; bindTabs(); renderNotebook(); return; }
   if (showAi && S.rightTab === "ai") { el.innerHTML = tabs + `<div id="aiView"></div>`; bindTabs(); renderSearchAi(); return; }
+  if (GW.ready && S.rightTab === "gw") { el.innerHTML = tabs + `<div id="gwView"></div>`; bindTabs(); renderGw(); return; }
   if (PUBLIC && !S.chosen) { el.innerHTML = tabs + `<div class="empty"><p>검색어를 넣고 왼쪽 결과를 누르면 조문과 그 법령의 판례·해석례가 여기에 나옵니다.</p>
-    <p><button type="button" class="secondary small" id="pubGuide">📘 설명서 보기</button></p></div>`; bindTabs(); $("#pubGuide").onclick = () => { S.rightTab = "guide"; renderReader(); }; return; }
+    <p><button type="button" class="secondary small" id="pubGuide">📘 설명서 보기</button>${GW.ready ? ` <button type="button" class="secondary small" id="pubGw">🤖 AI에게 묻기</button>` : ""}</p></div>`;
+    bindTabs(); $("#pubGuide").onclick = () => { S.rightTab = "guide"; renderReader(); }; if ($("#pubGw")) $("#pubGw").onclick = () => openGw(""); return; }
   if (S.rightTab === "ask" || !S.chosen) { S.rightTab = "ask"; el.innerHTML = tabs + `<div id="askView"></div>`; bindTabs(); renderAsk(); return; }
   if (!S.chosen) { el.innerHTML = tabs + `<p class="empty">결과를 고르면 본문이 여기에 나옵니다.</p>`; bindTabs(); return; }
   el.innerHTML = tabs + (L ? lawHtml(L) : caseDocHtml());
@@ -2659,6 +2679,10 @@ function guideHtml() {
       <li>선택한 법령은 <b>🕸 법령 연계도</b>의 가운데에도 놓입니다([🕸 연계도]로 바로 가기). [← 결과 목록]이나 ✕로 비교를 닫습니다.</li></ul>`)}
     ${sec("14. ★ 즐겨찾기", `<ul><li>결과 카드의 <b>☆</b>나 본문 위 [☆ 즐겨찾기]를 누르면 검색창 아래 <b>★ 즐겨찾기</b> 줄에 남습니다. 누르면 열리고, 두 번 누르면 선택(옆에 비교)되며, ×로 뺍니다.</li>
       <li>즐겨찾기는 <b>이 브라우저에만</b> 저장됩니다. 다른 컴퓨터·브라우저와 나누지 않으며, 인터넷 사용 기록에서 쿠키·사이트 데이터를 지우면 함께 지워집니다.</li></ul>`)}
+    ${GW.ready ? sec("15. 🤖 AI 질문 (회원)", `<ul><li>검색창 옆 <b>[🤖 AI에게 묻기]</b>나 오른쪽 <b>🤖 AI 질문</b> 탭에서 묻습니다. 처음 물을 때 <b>JG 회원 로그인</b> 창이 뜹니다(맨 위 [로그인]).</li>
+      <li>열어 둔 법령·고른 법령·검색 결과에서 질문과 관련된 조문을 골라 AI에게 근거로 주고, 답의 <span class="ref-chip">[1]</span> 같은 번호를 누르면 그 조문이 창으로 뜹니다.</li>
+      <li><b>[법제처 실시간 검색]</b>은 받은 DB에 아직 없는 최신 법령·판례·해석례·행정규칙·자치법규를 국가법령정보센터에서 바로 찾습니다.</li>
+      <li>AI 답은 참고용이며 법적 효력이 없습니다. 반드시 원문과 시행일을 확인하세요.</li></ul>`) : ""}
     </div></div>`;
 }
 function bindGuide() {
@@ -3708,6 +3732,173 @@ async function renderSideCmp() {
   $("#scChips").insertAdjacentHTML("beforeend", cited.map((x) => chip(x, "인용")).join(""));
   $("#scChips").querySelectorAll("[data-scb]").forEach((b) => b.onclick = () => pickB(b.dataset.scb));
 }
+
+/* ---------------------------------------------------------------- 🤖 AI 질문 (JG Gateway, 공개 홈페이지 law.jg.it.kr) */
+// On the public page at law.jg.it.kr only: the JG Gateway (api.jg.it.kr) answers with members' login.
+// tae-ai-client.js (the Gateway's SDK) and jg-connect.js (this app's connection, no keys in it) load
+// after the page; anywhere else (the claude.ai artifact, github.io) nothing loads and nothing shows.
+const GW = {ready: false, q: "", busy: false, answer: "", sources: [], error: "", live: null, liveTarget: "law"};
+const GW_HOSTS = ["law.jg.it.kr"];
+function loadScript(src) {
+  return new Promise((ok, no) => { const t = document.createElement("script"); t.src = src; t.async = true; t.onload = ok; t.onerror = () => no(new Error(src)); document.head.appendChild(t); });
+}
+if (PUBLIC && GW_HOSTS.includes(location.hostname)) {
+  loadScript("https://api.jg.it.kr/sdk/tae-ai-client.js").then(() => loadScript("jg-connect.js"))
+    .then(() => { if (window.JG && window.JG.ai) gwReady(); }).catch(() => { /* search keeps working without the Gateway */ });
+}
+function gwReady() {
+  GW.ready = true;
+  $("#gwAskBtn").hidden = false; $("#gwLogin").hidden = false;
+  gwLoginLabel();
+  renderList(); renderReader();
+}
+function gwLoginLabel() { const b = $("#gwLogin"); let on = false; try { on = window.JG.isLoggedIn(); } catch (e) { /* not yet */ } b.textContent = on ? "로그아웃" : "로그인"; }
+$("#gwLogin").onclick = async () => {
+  try { if (window.JG.isLoggedIn()) await window.JG.logout(); else await window.JG.login(); } catch (e) { /* closed the window */ }
+  gwLoginLabel();
+};
+$("#gwAskBtn").onclick = () => openGw($("#q").value.trim());
+function openGw(q) {
+  if (q) GW.q = q;
+  S.listOnly = false; S.split = false; S.rightTab = "gw";
+  renderList(); renderReader();
+  $("#reader").scrollIntoView({block: "start", behavior: "smooth"});
+  requestAnimationFrame(() => { const t = $("#gwQ"); if (t) t.focus(); });
+}
+const GW_ERRORS = {APP_PERMISSION_DENIED: "이 계정은 JG법령검색 AI를 쓸 권한이 없습니다. 관리자에게 문의하세요.",
+  LOGIN_REQUIRED: "로그인이 필요합니다. 맨 위 [로그인]을 누르세요.", UNAUTHORIZED: "로그인이 필요합니다. 맨 위 [로그인]을 누르세요."};
+function gwError(e) { const code = e && e.code; return (code && GW_ERRORS[code]) || (e && e.message) || "AI 답을 받지 못했습니다. 잠시 뒤 다시 해 보세요."; }
+// The articles the answer may rest on: the open law, the chosen laws, then the laws found for the question.
+async function gwSources(q) {
+  const words = q.split(/\s+/).map(compact).filter((w) => w.length >= 2);
+  const laws = [];
+  const add = (m) => { if (m && S.byMst.has(m) && !laws.includes(m)) laws.push(m); };
+  if (S.chosen && S.chosen.type === "law") add(S.chosen.id);
+  S.selected.forEach(add); [...S.picked.keys()].forEach(add);
+  for (const it of S.results) if (it.type === "law" && laws.length < 4) add(it.mst);
+  if (laws.length < 3) {
+    const cand = await candidateMsts(q);
+    if (cand) rankLaws(q, [...cand].map((m) => S.byMst.get(m)).filter(Boolean)).slice(0, 4).forEach((L) => laws.length < 5 && add(L.mst));
+  }
+  const out = [];
+  for (const mst of laws.slice(0, 5)) {
+    const L = S.byMst.get(mst), d = await lawData(mst);
+    // A word found in few articles of the law counts more (사용허가 over 공유재산 in 공유재산법); the heading counts double.
+    const arts = d.a.map(([h, t], i) => ({i, h, t: cleanArticle(h, t) || "", c: compact(h + t), hc: compact(h)}))
+      .filter((x) => x.t && !/^부칙/.test(x.h || "") && !/^제\d+(장|절|편)/.test(x.h || ""));
+    const weight = new Map(words.map((w) => [w, Math.log(1 + arts.length / (1 + arts.filter((x) => x.c.includes(w)).length))]));
+    const scored = arts.map((x) => ({...x, score: words.reduce((a, w) => a + (x.c.includes(w) ? weight.get(w) * (x.hc.includes(w) ? 2 : 1) : 0), 0)}));
+    const best = scored.filter((x) => x.score).sort((a, b) => b.score - a.score || a.i - b.i).slice(0, 4);
+    if (!best.length && mst === laws[0]) best.push(...scored.slice(0, 2));
+    for (const x of best) out.push({mst, i: x.i, h: x.h, title: `${L.title} ${x.h}`, text: x.t.slice(0, 1500)});
+    if (out.length >= 14) break;
+  }
+  return out.slice(0, 14);
+}
+function gwAnswerHtml(text, sources) {
+  return esc(text).replace(/\[(\d{1,2})\]/g, (m, k) => { const src = sources[+k - 1];
+    return src ? `<button type="button" class="ref-chip" data-gwref="${+k - 1}" title="${esc(src.title)}">[${k}]</button>` : m; });
+}
+function renderGw() {
+  const box = $("#gwView");
+  if (!box) return;
+  let on = false; try { on = window.JG.isLoggedIn(); } catch (e) { /* not ready */ }
+  box.innerHTML = `<div class="gw"><div class="nb-top"><div><h2>🤖 AI에게 묻기</h2>
+      <p class="meta">열어 둔 법령과 검색 결과에서 질문과 관련된 조문을 골라 근거로 답합니다(JG AI · 회원 전용${on ? "" : " · 처음 물을 때 로그인 창이 뜹니다"}). AI 답은 참고용이며 법적 효력이 없습니다.</p></div></div>
+    <label class="vh" for="gwQ">질문</label><textarea id="gwQ" rows="3" maxlength="600" placeholder="예: 공유재산 사용허가 기간은 얼마까지 할 수 있나요?">${esc(GW.q)}</textarea>
+    <div class="gw-btns"><button type="button" class="primary small" id="gwSend" ${GW.busy ? "disabled" : ""}>${GW.busy ? "답을 받는 중…" : "질문하기"}</button>
+      <span class="gw-live"><label class="vh" for="gwTarget">찾을 자료</label><select id="gwTarget">${["law", "prec", "expc", "admrul", "ordin"].map((k) => `<option value="${k}" ${GW.liveTarget === k ? "selected" : ""}>${LABEL[k]}</option>`).join("")}</select>
+      <button type="button" class="ghost small" id="gwLive" title="받은 DB에 없는 최신 자료를 국가법령정보센터에서 바로 찾기">법제처 실시간 검색</button></span></div>
+    ${GW.error ? `<p class="error" role="alert">${esc(GW.error)}</p>` : ""}
+    <div class="gw-answer" id="gwAnswer" aria-live="polite">${GW.answer ? gwAnswerHtml(GW.answer, GW.sources) : ""}</div>
+    ${GW.sources.length ? `<details class="gw-src"><summary>근거로 준 조문 ${GW.sources.length}개</summary><ol>${GW.sources.map((x, k) => `<li><button type="button" class="link-btn" data-gwref="${k}">${esc(x.title)}</button></li>`).join("")}</ol></details>` : ""}
+    <div id="gwLiveOut">${gwLiveHtml()}</div></div>`;
+  const q = $("#gwQ");
+  q.oninput = () => { GW.q = q.value; };
+  q.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); gwAsk(); } };
+  $("#gwSend").onclick = gwAsk;
+  $("#gwTarget").onchange = (e) => { GW.liveTarget = e.target.value; };
+  $("#gwLive").onclick = gwLive;
+  bindGwRefs(box);
+}
+function bindGwRefs(root) {
+  root.querySelectorAll("[data-gwref]").forEach((b) => b.onclick = () => { const x = GW.sources[+b.dataset.gwref]; if (x) openLawWindow(x.mst, x.i); });
+}
+async function gwAsk() {
+  const q = (GW.q = ($("#gwQ") ? $("#gwQ").value : GW.q).trim());
+  if (!q || GW.busy) return;
+  GW.busy = true; GW.error = ""; GW.answer = ""; GW.sources = [];
+  renderGw();
+  try {
+    const sources = await gwSources(q);
+    GW.sources = sources;
+    renderGw();
+    const paint = (acc) => { GW.answer = String(acc || ""); const a = $("#gwAnswer"); if (a) { a.innerHTML = gwAnswerHtml(GW.answer, GW.sources); bindGwRefs(a); } };
+    const res = sources.length
+      ? await window.JG.askWithSources(q, sources.map((x) => ({title: x.title, text: x.text})), (delta, acc) => paint(acc))
+      : await window.JG.askStream(q, (delta, acc) => paint(acc));
+    const final = typeof res === "string" ? res : res && (res.text || res.answer || res.content);
+    if (final) GW.answer = String(final);
+  } catch (e) { GW.error = gwError(e); }
+  GW.busy = false;
+  gwLoginLabel();
+  renderGw();
+}
+// 법제처 실시간 검색: the Gateway asks 국가법령정보센터 (key kept on the Gateway); results not yet in the DB.
+async function gwLive() {
+  const q = (GW.q = ($("#gwQ") ? $("#gwQ").value : GW.q).trim()) || S.query;
+  if (!q) { GW.error = "찾을 낱말을 질문 칸에 넣으세요."; renderGw(); return; }
+  GW.live = {busy: true, q, target: GW.liveTarget, items: []}; GW.error = "";
+  renderGw();
+  try {
+    const data = await window.JG.ext["law-search"]({query: q, target: GW.liveTarget, display: 30});
+    GW.live = {busy: false, q, target: GW.liveTarget, items: liveItems(data, GW.liveTarget), total: liveTotal(data)};
+  } catch (e) { GW.live = null; GW.error = gwError(e); }
+  gwLoginLabel();
+  renderGw();
+}
+// The search answer of 국가법령정보센터 (LawSearch.law[], PrecSearch.prec[] …): the first list found inside.
+function liveItems(data, target) {
+  let list = null;
+  const walk = (v, depth) => {
+    if (list || !v || typeof v !== "object" || depth > 4) return;
+    if (Array.isArray(v)) { if (v.length && typeof v[0] === "object") list = v; return; }
+    if (v[target] && typeof v[target] === "object") { list = Array.isArray(v[target]) ? v[target] : [v[target]]; return; }
+    for (const k of Object.keys(v)) walk(v[k], depth + 1);
+  };
+  walk(typeof data === "string" ? (() => { try { return JSON.parse(data); } catch (e) { return null; } })() : data, 0);
+  const pick = (o, keys) => { for (const k of keys) if (o[k]) return String(o[k]); return ""; };
+  return (list || []).map((o) => ({
+    title: pick(o, ["법령명한글", "법령명", "사건명", "안건명", "행정규칙명", "자치법규명", "title"]),
+    no: pick(o, ["사건번호", "안건번호", "법령일련번호", "행정규칙일련번호", "자치법규일련번호"]),
+    date: pick(o, ["시행일자", "선고일자", "회신일자", "발령일자", "공포일자"]),
+    org: pick(o, ["소관부처명", "법원명", "질의기관명", "소관부처명", "지자체기관명", "자치단체명"]),
+    kind: pick(o, ["법령구분명", "사건종류명", "행정규칙종류", "자치법규종류"]),
+  })).filter((x) => x.title);
+}
+function liveTotal(data) { let t = null; JSON.stringify(data || {}, (k, v) => { if (t == null && k === "totalCnt") t = v; return v; }); return t; }
+function liveLink(x, target) {
+  const base = "https://www.law.go.kr/";
+  if (target === "law") return base + "법령/" + encodeURIComponent(x.title);
+  if (target === "admrul") return base + "행정규칙/" + encodeURIComponent(x.title);
+  if (target === "ordin") return base + "자치법규/" + encodeURIComponent(x.title);
+  if (target === "prec" && x.no) return base + "판례/(" + encodeURIComponent(x.no) + ")";
+  return "https://www.law.go.kr/";
+}
+function gwLiveHtml() {
+  const L = GW.live;
+  if (!L) return "";
+  if (L.busy) return `<p class="meta">국가법령정보센터에서 ‘${esc(L.q)}’ 찾는 중…</p>`;
+  return `<section class="gw-live-out"><h3>법제처 실시간 검색 · ${esc(LABEL[L.target])} ‘${esc(L.q)}’ <span class="meta">${L.total != null ? n(+L.total) + "건 중 " : ""}${n(L.items.length)}건</span></h3>
+    ${L.items.length ? `<ul>${L.items.map((x) => { const inDb = L.target === "law" && lawByName(x.title);
+      return `<li><b>${esc(x.title)}</b> <span class="meta">${esc([x.kind, x.org, x.no, x.date].filter(Boolean).join(" · "))}</span>
+        ${inDb ? `<button type="button" class="ghost small" data-gwdb="${inDb.mst}">받은 DB에서 열기</button>` : `<span class="type-label">받은 DB에 없음</span>`}
+        <a href="${liveLink(x, L.target)}" target="_blank" rel="noopener noreferrer">원문 ↗</a></li>`; }).join("")}</ul>` : `<p class="empty">찾은 자료가 없습니다.</p>`}</section>`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest("[data-gwdb]");
+  if (b) openLawWindow(b.dataset.gwdb);
+});
 
 /* ---------------------------------------------------------------- ★ 즐겨찾기 (this browser only) */
 // Kept in this browser's storage: clearing the browsing data (사이트 데이터) clears them too.
