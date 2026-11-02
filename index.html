@@ -198,15 +198,9 @@ button.filter-chip {padding:6px 14px;min-height:36px;font-size:14px;}
 .workspace {display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:16px;align-items:start;}
 .workspace.list-only {grid-template-columns:minmax(0,1fr);}
 .gw {padding:22px 26px;display:grid;gap:12px;}
-.gw-chat {display:flex;flex-direction:column;position:fixed;inset:0;z-index:60;height:100dvh;background:var(--surface-100);
-  --gw-pad:max(16px, calc((100% - 860px) / 2));}
-.gw-chat .gw-bar,.gw-chat .gw-msgs,.gw-chat .gw-composer {padding-left:var(--gw-pad);padding-right:var(--gw-pad);}
-body.gw-on {overflow:hidden;}
-.workspace.chat {grid-template-columns:minmax(0,1fr);}
-.workspace.chat .result-panel {display:none;}
-.workspace.chat .reader {min-height:0;}
-.workspace.chat .right-tabs {display:none;}
-body.gw-on .scroll-btns {display:none;}
+/* the AI 질문 box: a chat whose messages scroll inside it, the question box at its bottom */
+@media (max-width:810px) { body.gw-open .scroll-btns {display:none;} }
+.gw-chat {display:flex;flex-direction:column;height:clamp(380px, calc(100dvh - var(--sticky-h,200px) - 76px), 820px);}
 .gw-bar b {white-space:nowrap;}
 .gw-bar {display:flex;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--line);flex:none;}
 .gw-bar-btns {margin-left:auto;}
@@ -235,7 +229,6 @@ body.gw-on .scroll-btns {display:none;}
 .gw-tools {display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;}
 .gw-tools select {min-height:32px;border:1px solid var(--line);border-radius:8px;background:var(--surface-100);color:var(--ink);padding:2px 6px;font-size:13px;}
 .gw-hint {margin-left:auto;font-size:12px;}
-.gw-chat .gw-composer {padding-bottom:calc(12px + env(safe-area-inset-bottom));border-radius:0;}
 @media (max-width:560px) { .gw-hint,.gw-who {display:none;} .gw-msgs {padding:12px;} .gw-msg.me .gw-bubble {max-width:88%;} .gw-avatar {display:none;} .gw-msg.ai .gw-bubble {max-width:100%;} }
 .gw h2 {margin:0 0 4px;font-size:20px;}
 .gw textarea {width:100%;min-height:84px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-100);color:var(--ink);font:inherit;resize:vertical;}
@@ -378,6 +371,9 @@ mark {background:var(--mark);color:var(--mark-ink);border-radius:3px;padding:0 1
 :root {--sticky-h:0px; --dock-h:0px;}
 html {scroll-padding-top:calc(var(--sticky-h) + 8px);scroll-padding-bottom:calc(var(--dock-h) + 8px);}
 body {padding-bottom:var(--dock-h);}
+/* The browser's scroll anchoring "corrected" the scroll when the frozen area changed size, jumping the page back
+   to the top (and back again): this page keeps its own place. */
+html,body {overflow-anchor:none;}
 .sticky-top {position:sticky;top:0;z-index:20;background:var(--surface-200);margin:0 -4px;padding:8px 4px 2px;}
 .sticky-top.stuck {box-shadow:0 6px 14px -10px #0006;border-bottom:1px solid var(--line);}
 .sticky-top.stuck .saved-searches {display:none;}
@@ -1962,9 +1958,7 @@ function renderLayout() {
   ws.classList.toggle("list-only", S.listOnly && !S.split && S.rightTab === "doc");
   ws.classList.toggle("split", !!S.split);
   $("#sideCmp").hidden = !S.split;
-  const chat = GW.ready && S.rightTab === "gw" && S.page !== "graph" && S.page !== "compare";
-  ws.classList.toggle("chat", chat);  // the AI chat takes the whole width
-  document.body.classList.toggle("gw-on", chat);
+  document.body.classList.toggle("gw-open", GW.ready && S.rightTab === "gw" && (S.page || "search") === "search");
 }
 $("#list").addEventListener("keydown", (e) => {
   const buttons = [...$("#list").querySelectorAll(".result")];
@@ -3171,7 +3165,25 @@ ctx.addEventListener("keydown", (e) => {
     root.style.setProperty("--dock-h", dock.hidden ? "0px" : dock.offsetHeight + "px");
   };
   if (window.ResizeObserver) { const ro = new ResizeObserver(measure); ro.observe(top); ro.observe($("#askDock")); }
-  if (window.IntersectionObserver) new IntersectionObserver(([e]) => { top.classList.toggle("stuck", !e.isIntersecting); measure(); }).observe($("#stickSentinel"));
+  // Compacting the frozen area once it sticks must not move the page under it: the space it gives up is kept as a
+  // margin below it. (Without that the content jumped up, the area unstuck and grew again — the page shook.)
+  // Content changing inside the frozen area while stuck keeps the same total height for the same reason.
+  let full = 0;
+  const setStuck = (on) => {
+    if (on === top.classList.contains("stuck")) return;
+    if (on) {
+      full = top.offsetHeight;
+      top.classList.add("stuck");
+      top.style.marginBottom = Math.max(0, full - top.offsetHeight) + "px";
+    } else {
+      top.classList.remove("stuck");
+      top.style.marginBottom = "";
+    }
+    measure();
+  };
+  const keep = () => { if (top.classList.contains("stuck") && full) top.style.marginBottom = Math.max(0, full - top.offsetHeight) + "px"; };
+  if (window.ResizeObserver) new ResizeObserver(keep).observe(top);
+  if (window.IntersectionObserver) new IntersectionObserver(([e]) => setStuck(!e.isIntersecting)).observe($("#stickSentinel"));
   const btns = $("#scrollBtns");
   const place = () => {
     const max = root.scrollHeight - innerHeight;
@@ -3973,7 +3985,7 @@ function renderGw() {
   if (!box) return;
   if (!$("#gwChat")) {
     box.innerHTML = `<div class="gw-chat" id="gwChat">
-      <div class="gw-bar"><button type="button" class="ghost small" id="gwBack" title="검색 결과·본문으로">← 검색 결과</button><b>🤖 AI 질문</b> <span class="meta gw-who">JG AI · 회원 전용</span><span class="gw-bar-btns"><button type="button" class="ghost small" id="gwNew">＋ 새 대화</button></span></div>
+      <div class="gw-bar"><b>🤖 AI 질문</b> <span class="meta gw-who">JG AI · 회원 전용</span><span class="gw-bar-btns"><button type="button" class="ghost small" id="gwNew">＋ 새 대화</button></span></div>
       <div class="gw-msgs" id="gwMsgs" tabindex="0" aria-live="polite" aria-label="대화"></div>
       <form class="gw-composer" id="gwForm">
         <div class="gw-input"><label class="vh" for="gwQ">질문</label>
@@ -3992,7 +4004,6 @@ function renderGw() {
     $("#gwNew").onclick = () => { if (GW.busy) return; GW.turns = []; GW.q = ""; q.value = ""; grow(); renderGw(); q.focus(); };
     $("#gwTarget").onchange = (e) => { GW.liveTarget = e.target.value; };
     $("#gwLive").onclick = gwLive;
-    $("#gwBack").onclick = () => { S.rightTab = "doc"; S.listOnly = !S.chosen && S.results.length > 0; renderList(); renderReader(); };
   }
   const m = $("#gwMsgs"), atEnd = m.scrollHeight - m.scrollTop - m.clientHeight < 140;
   m.innerHTML = gwMsgsHtml();
@@ -4001,10 +4012,16 @@ function renderGw() {
   bindGwRefs(m);
   if (atEnd || GW.stick) { m.scrollTop = m.scrollHeight; GW.stick = false; }
 }
-document.addEventListener("keydown", (e) => {  // Esc: back from the full-screen chat (a law window closes first)
-  if (e.key === "Escape" && document.body.classList.contains("gw-on") && !$("#dlg").open && $("#gwBack")) $("#gwBack").click();
-});
-function gwAlign() { const t = $("#gwQ"); if (t) t.focus({preventScroll: true}); }  // the chat is full screen
+// Opening: the box (with its tab) right under the frozen search area, the cursor in the question box.
+function gwAlign() {
+  const r = $("#reader");
+  if (!r || !$("#gwChat")) return;
+  const stick = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sticky-h")) || 0;
+  const go = () => window.scrollTo({top: Math.max(0, r.getBoundingClientRect().top + scrollY - stick() - 8)});
+  go();
+  setTimeout(go, 120);  // the frozen area is smaller once it sticks
+  const t = $("#gwQ"); if (t) t.focus({preventScroll: true});
+}
 // Keep the newest message in view while it grows, unless the reader scrolled up to read.
 function gwFollow() { const m = $("#gwMsgs"); if (m && m.scrollHeight - m.scrollTop - m.clientHeight < 160) m.scrollTop = m.scrollHeight; }
 function bindGwRefs(root) {
