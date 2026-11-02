@@ -3845,7 +3845,20 @@ function openGw(q) {
 }
 const GW_ERRORS = {APP_PERMISSION_DENIED: "이 계정은 JG법령검색 AI를 쓸 권한이 없습니다. 관리자에게 문의하세요.",
   LOGIN_REQUIRED: "로그인이 필요합니다. 맨 위 [로그인]을 누르세요.", UNAUTHORIZED: "로그인이 필요합니다. 맨 위 [로그인]을 누르세요."};
-function gwError(e) { const code = e && e.code; return (code && GW_ERRORS[code]) || (e && e.message) || "AI 답을 받지 못했습니다. 잠시 뒤 다시 해 보세요."; }
+// The Gateway's own words, with its code and HTTP status (so the cause shows, not only "받지 못했습니다").
+function gwDetail(e) {
+  if (!e) return "";
+  const bits = [e.code && `코드 ${e.code}`, (e.status || e.httpStatus) && `HTTP ${e.status || e.httpStatus}`, e.name && e.name !== "Error" && e.name !== "TaeAIError" && e.name];
+  const extra = e.detail || e.details || (e.body && typeof e.body === "string" ? e.body : "") || (e.cause && e.cause.message) || "";
+  return [...bits, extra && String(extra).slice(0, 200)].filter(Boolean).join(" · ");
+}
+function gwError(e) {
+  const code = e && e.code;
+  const base = (code && GW_ERRORS[code]) || (e && e.message) || "AI 답을 받지 못했습니다.";
+  const d = gwDetail(e);
+  return d && !base.includes(d) ? `${base} (${d})` : base;
+}
+const GW_TRIES = [{n: 14, chars: 1500, keep: GW_KEEP, hist: 900}, {n: 8, chars: 700, keep: 2, hist: 500}, {n: 4, chars: 400, keep: 1, hist: 300}];
 // The articles the answer may rest on: the open law, the chosen laws, then the laws found for the question.
 // The words of a question, without 은·는·을·를… and punctuation (기간은? -> 기간).
 function gwWords(q) {
@@ -3896,7 +3909,7 @@ function gwAnswerHtml(text, sources, turn, done = true) {
 function gwTurnHtml(t, k) {
   return `<div class="gw-turn" id="gwTurn${k}"><p class="gw-q"><b>Q.</b> ${esc(t.q)}</p>
     <div class="gw-answer">${t.answer ? gwAnswerHtml(t.answer, t.sources, k, t.done) : t.error ? "" : '<span class="meta">답을 받는 중…</span>'}</div>
-    ${t.error ? `<p class="error" role="alert">${esc(t.error)}</p>` : ""}
+    ${t.error ? `<p class="error" role="alert">${esc(t.error)}</p>` : ""}${t.note ? `<p class="meta">${esc(t.note)}</p>` : ""}
     ${t.sources.length ? `<details class="gw-src"><summary>근거로 준 조문 ${t.sources.length}개</summary><ol>${t.sources.map((x, i) => `<li><button type="button" class="link-btn" data-gwturn="${k}" data-gwref="${i}">${esc(x.title)}</button></li>`).join("")}</ol></details>` : ""}</div>`;
 }
 function renderGw() {
@@ -3945,20 +3958,39 @@ async function gwAsk() {
     const last = prior[prior.length - 1];
     turn.sources = await gwSources(last ? `${last.q} ${q}` : q, last ? [...new Set(last.sources.map((x) => x.mst))] : []);
     renderGw(); scroll();
-    const text = prior.length
-      ? `[이전 대화]\n${prior.map((t) => `질문: ${t.q}\n답: ${t.answer.slice(0, 900)}`).join("\n\n")}\n\n[이번 질문 — 위 대화에 이어서 답하세요]\n${q}`
-      : q;
+    const all = turn.sources;
     const paint = (acc) => {
       turn.answer = String(acc || "");
       const a = document.querySelector(`#gwTurn${k} .gw-answer`);
       if (a) { a.innerHTML = gwAnswerHtml(turn.answer, turn.sources, k, false); bindGwRefs(a); }
     };
-    const res = turn.sources.length
-      ? await window.JG.askWithSources(text, turn.sources.map((x) => ({title: x.title, text: x.text})), (delta, acc) => paint(acc))
-      : await window.JG.askStream(text, (delta, acc) => paint(acc));
-    const final = typeof res === "string" ? res : res && (res.text || res.answer || res.content);
-    if (final) turn.answer = String(final);
-    if (!turn.answer) turn.error = "빈 답이 왔습니다. 다시 물어보세요.";
+    // Too much for the Gateway (size, time) fails: the same question again with fewer, shorter articles and less history.
+    const errors = [];
+    for (const t of GW_TRIES) {
+      const hist = prior.slice(-t.keep);
+      const text = hist.length
+        ? `[이전 대화]\n${hist.map((x) => `질문: ${x.q}\n답: ${x.answer.slice(0, t.hist)}`).join("\n\n")}\n\n[이번 질문 — 위 대화에 이어서 답하세요]\n${q}`
+        : q;
+      turn.sources = all.slice(0, t.n);
+      turn.answer = "";
+      try {
+        const res = turn.sources.length
+          ? await window.JG.askWithSources(text, turn.sources.map((x) => ({title: x.title, text: x.text.slice(0, t.chars)})), (delta, acc) => paint(acc))
+          : await window.JG.askStream(text, (delta, acc) => paint(acc));
+        const final = typeof res === "string" ? res : res && (res.text || res.answer || res.content);
+        if (final) turn.answer = String(final);
+        if (turn.answer) break;
+        errors.push("빈 답");
+      } catch (e) {
+        errors.push(gwError(e));
+        console.warn("JG Gateway ask failed", t, e);
+        const code = e && e.code;
+        if (code && /PERMISSION|LOGIN|UNAUTHORIZED|AUTH|QUOTA|LIMIT/i.test(code)) break;  // smaller will not help
+      }
+      if (!turn.answer) { const a = document.querySelector(`#gwTurn${k} .gw-answer`); if (a) a.innerHTML = '<span class="meta">자료를 줄여 다시 묻는 중…</span>'; }
+    }
+    if (!turn.answer) turn.error = [...new Set(errors)].join(" / ") || "빈 답이 왔습니다. 다시 물어보세요.";
+    else if (errors.length) turn.note = `처음 요청이 실패해(${errors[0]}) 근거 조문을 ${turn.sources.length}개로 줄여 받았습니다.`;
   } catch (e) { turn.error = gwError(e); }
   turn.done = true;
   GW.busy = false;
