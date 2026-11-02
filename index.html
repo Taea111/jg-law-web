@@ -198,6 +198,45 @@ button.filter-chip {padding:6px 14px;min-height:36px;font-size:14px;}
 .workspace {display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:16px;align-items:start;}
 .workspace.list-only {grid-template-columns:minmax(0,1fr);}
 .gw {padding:22px 26px;display:grid;gap:12px;}
+.gw-chat {display:flex;flex-direction:column;position:fixed;inset:0;z-index:60;height:100dvh;background:var(--surface-100);
+  --gw-pad:max(16px, calc((100% - 860px) / 2));}
+.gw-chat .gw-bar,.gw-chat .gw-msgs,.gw-chat .gw-composer {padding-left:var(--gw-pad);padding-right:var(--gw-pad);}
+body.gw-on {overflow:hidden;}
+.workspace.chat {grid-template-columns:minmax(0,1fr);}
+.workspace.chat .result-panel {display:none;}
+.workspace.chat .reader {min-height:0;}
+.workspace.chat .right-tabs {display:none;}
+body.gw-on .scroll-btns {display:none;}
+.gw-bar b {white-space:nowrap;}
+.gw-bar {display:flex;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--line);flex:none;}
+.gw-bar-btns {margin-left:auto;}
+.gw-msgs {flex:1;overflow-y:auto;overscroll-behavior:contain;padding:18px;display:flex;flex-direction:column;gap:14px;scroll-behavior:auto;}
+.gw-msg {display:flex;gap:10px;align-items:flex-start;max-width:100%;}
+.gw-msg.me {justify-content:flex-end;}
+.gw-msg.me .gw-bubble {background:var(--brand);color:#fff;border-radius:16px 16px 4px 16px;max-width:min(80%,640px);white-space:pre-wrap;}
+.gw-msg.ai .gw-bubble {background:var(--surface-200);border:1px solid var(--line);border-radius:4px 16px 16px 16px;max-width:min(92%,820px);min-width:0;}
+.gw-bubble {padding:10px 14px;line-height:1.75;overflow-wrap:anywhere;}
+.gw-avatar {flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--surface-200);border:1px solid var(--line);font-size:17px;}
+.gw-bubble .gw-src {margin-top:8px;font-size:14px;}
+.gw-bubble .error,.gw-bubble .meta {margin:6px 0 0;}
+.gw-typing {display:inline-flex;gap:4px;padding:6px 0;}
+.gw-typing i {width:7px;height:7px;border-radius:50%;background:var(--ink-muted);animation:gwDot 1.2s infinite ease-in-out;}
+.gw-typing i:nth-child(2) {animation-delay:.15s;} .gw-typing i:nth-child(3) {animation-delay:.3s;}
+@keyframes gwDot {0%,80%,100% {opacity:.25;transform:translateY(0);} 40% {opacity:1;transform:translateY(-3px);}}
+.gw-hello {margin:auto;max-width:560px;text-align:center;display:grid;gap:10px;padding:20px 0;}
+.gw-hello h2 {margin:0;font-size:22px;}
+.gw-hello-icon {font-size:38px;}
+.gw-suggest {display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+.gw-composer {flex:none;border-top:1px solid var(--line);padding:10px 14px 12px;background:var(--surface-100);display:grid;gap:6px;border-radius:0 0 12px 12px;}
+.gw-input {display:flex;gap:8px;align-items:flex-end;border:1px solid var(--line);border-radius:14px;padding:6px 6px 6px 12px;background:var(--surface-100);}
+.gw-input:focus-within {border-color:var(--brand);}
+.gw-input textarea {flex:1;border:0;outline:none;resize:none;background:none;color:var(--ink);font:inherit;line-height:1.6;padding:6px 0;max-height:160px;min-height:24px;}
+.gw-send {flex:none;width:38px;height:38px;min-height:38px;padding:0;border-radius:50%;font-size:18px;font-weight:800;}
+.gw-tools {display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;}
+.gw-tools select {min-height:32px;border:1px solid var(--line);border-radius:8px;background:var(--surface-100);color:var(--ink);padding:2px 6px;font-size:13px;}
+.gw-hint {margin-left:auto;font-size:12px;}
+.gw-chat .gw-composer {padding-bottom:calc(12px + env(safe-area-inset-bottom));border-radius:0;}
+@media (max-width:560px) { .gw-hint,.gw-who {display:none;} .gw-msgs {padding:12px;} .gw-msg.me .gw-bubble {max-width:88%;} .gw-avatar {display:none;} .gw-msg.ai .gw-bubble {max-width:100%;} }
 .gw h2 {margin:0 0 4px;font-size:20px;}
 .gw textarea {width:100%;min-height:84px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-100);color:var(--ink);font:inherit;resize:vertical;}
 .gw-btns {display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;}
@@ -211,7 +250,7 @@ button.filter-chip {padding:6px 14px;min-height:36px;font-size:14px;}
 .gw-answer:empty {display:none;}
 .gw-src ol {margin:6px 0 0;padding-left:22px;}
 .link-btn {border:0;background:none;padding:0;color:var(--brand);text-decoration:underline;cursor:pointer;font:inherit;text-align:left;}
-.gw-live-out h3 {font-size:16px;margin:8px 0;}
+.gw-live-out h3 {font-size:15px;margin:0 0 8px;}
 .gw-live-out ul {list-style:none;margin:0;padding:0;display:grid;gap:8px;}
 .gw-live-out li {border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;}
 .case-find {display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:10px;}
@@ -1923,6 +1962,9 @@ function renderLayout() {
   ws.classList.toggle("list-only", S.listOnly && !S.split && S.rightTab === "doc");
   ws.classList.toggle("split", !!S.split);
   $("#sideCmp").hidden = !S.split;
+  const chat = GW.ready && S.rightTab === "gw" && S.page !== "graph" && S.page !== "compare";
+  ws.classList.toggle("chat", chat);  // the AI chat takes the whole width
+  document.body.classList.toggle("gw-on", chat);
 }
 $("#list").addEventListener("keydown", (e) => {
   const buttons = [...$("#list").querySelectorAll(".result")];
@@ -3214,6 +3256,7 @@ function renderHeadCounts() {
 S.page = "search";
 function showPage(page) {
   S.page = page;
+  queueMicrotask(renderLayout);
   document.querySelectorAll("[data-page]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.page === page)));
   $("#pageSearch").hidden = page !== "search";
   $("#pageGraph").hidden = page !== "graph";
@@ -3840,8 +3883,7 @@ function openGw(q) {
   if (q) GW.q = q;
   S.listOnly = false; S.split = false; S.rightTab = "gw";
   renderList(); renderReader();
-  $("#reader").scrollIntoView({block: "start", behavior: "smooth"});
-  requestAnimationFrame(() => { const t = $("#gwQ"); if (t) t.focus(); });
+  requestAnimationFrame(gwAlign);
 }
 const GW_ERRORS = {APP_PERMISSION_DENIED: "이 계정은 JG법령검색 AI를 쓸 권한이 없습니다. 관리자에게 문의하세요.",
   LOGIN_REQUIRED: "로그인이 필요합니다. 맨 위 [로그인]을 누르세요.", UNAUTHORIZED: "로그인이 필요합니다. 맨 위 [로그인]을 누르세요."};
@@ -3906,36 +3948,65 @@ function gwAnswerHtml(text, sources, turn, done = true) {
   return linked.replace(/\[(\d{1,2})\]/g, (m, k) => { const src = sources[+k - 1];
     return src ? `<button type="button" class="ref-chip" data-gwturn="${turn}" data-gwref="${+k - 1}" title="${esc(src.title)}">[${k}]</button>` : m; });
 }
+// A chat like Claude·ChatGPT: the messages scroll on their own, the question box stays at the bottom.
+const GW_SUGGEST = ["공유재산 사용허가 기간은 얼마까지 할 수 있나요?", "건축허가를 받지 않아도 되는 경우는?", "수의계약을 할 수 있는 금액 기준은?", "개발행위허가 기준과 절차를 알려 주세요"];
 function gwTurnHtml(t, k) {
-  return `<div class="gw-turn" id="gwTurn${k}"><p class="gw-q"><b>Q.</b> ${esc(t.q)}</p>
-    <div class="gw-answer">${t.answer ? gwAnswerHtml(t.answer, t.sources, k, t.done) : t.error ? "" : '<span class="meta">답을 받는 중…</span>'}</div>
-    ${t.error ? `<p class="error" role="alert">${esc(t.error)}</p>` : ""}${t.note ? `<p class="meta">${esc(t.note)}</p>` : ""}
-    ${t.sources.length ? `<details class="gw-src"><summary>근거로 준 조문 ${t.sources.length}개</summary><ol>${t.sources.map((x, i) => `<li><button type="button" class="link-btn" data-gwturn="${k}" data-gwref="${i}">${esc(x.title)}</button></li>`).join("")}</ol></details>` : ""}</div>`;
+  if (t.kind === "live") return `<div class="gw-msg me"><div class="gw-bubble">🔎 법제처 실시간 검색: ${esc(LABEL[t.target])} ‘${esc(t.q)}’</div></div>
+    <div class="gw-msg ai" id="gwTurn${k}"><div class="gw-avatar" aria-hidden="true">🔎</div><div class="gw-bubble">${gwLiveHtml(t)}</div></div>`;
+  return `<div class="gw-msg me"><div class="gw-bubble">${esc(t.q)}</div></div>
+    <div class="gw-msg ai" id="gwTurn${k}"><div class="gw-avatar" aria-hidden="true">🤖</div><div class="gw-bubble">
+      <div class="gw-answer">${t.answer ? gwAnswerHtml(t.answer, t.sources, k, t.done) : t.error ? "" : '<span class="gw-typing" aria-label="답을 받는 중"><i></i><i></i><i></i></span>'}</div>
+      ${t.error ? `<p class="error" role="alert">${esc(t.error)}</p>` : ""}${t.note ? `<p class="meta">${esc(t.note)}</p>` : ""}
+      ${t.sources.length && (t.answer || t.done) ? `<details class="gw-src"><summary>근거 조문 ${t.sources.length}개</summary><ol>${t.sources.map((x, i) => `<li><button type="button" class="link-btn" data-gwturn="${k}" data-gwref="${i}">${esc(x.title)}</button></li>`).join("")}</ol></details>` : ""}
+    </div></div>`;
+}
+function gwMsgsHtml() {
+  if (GW.turns.length) return GW.turns.map(gwTurnHtml).join("");
+  let on = false; try { on = window.JG.isLoggedIn(); } catch (e) { /* not ready */ }
+  return `<div class="gw-hello"><div class="gw-hello-icon" aria-hidden="true">🤖</div><h2>무엇이든 물어보세요</h2>
+    <p class="meta">열어 둔 법령과 검색 결과에서 관련 조문을 골라 근거로 답하고, 대화를 이어서 기억합니다. 답의 [1]·법령 이름을 누르면 그 조문이 창으로 뜹니다.${on ? "" : " 처음 물을 때 JG 회원 로그인 창이 뜹니다."}</p>
+    <div class="gw-suggest">${GW_SUGGEST.map((x, i) => `<button type="button" class="filter-chip" data-gwsug="${i}">${esc(x)}</button>`).join("")}</div>
+    <p class="meta">AI 답은 참고용이며 법적 효력이 없습니다. 반드시 원문과 시행일을 확인하세요.</p></div>`;
 }
 function renderGw() {
   const box = $("#gwView");
   if (!box) return;
-  let on = false; try { on = window.JG.isLoggedIn(); } catch (e) { /* not ready */ }
-  const more = GW.turns.length > 0;
-  box.innerHTML = `<div class="gw"><div class="nb-top"><div><h2>🤖 AI에게 묻기</h2>
-      <p class="meta">열어 둔 법령과 검색 결과에서 질문과 관련된 조문을 골라 근거로 답하고, 앞의 대화(최근 ${GW_KEEP}개)를 이어서 기억합니다(JG AI · 회원 전용${on ? "" : " · 처음 물을 때 로그인 창이 뜹니다"}). AI 답은 참고용이며 법적 효력이 없습니다.</p></div>
-      ${more ? `<button type="button" class="ghost small" id="gwNew" ${GW.busy ? "disabled" : ""}>새 대화</button>` : ""}</div>
-    <div class="gw-thread" id="gwThread" aria-live="polite">${GW.turns.map(gwTurnHtml).join("")}</div>
-    <label class="vh" for="gwQ">${more ? "이어서 묻기" : "질문"}</label><textarea id="gwQ" rows="3" maxlength="600" placeholder="${more ? "이어서 묻기 (예: 그럼 기간을 연장하려면?) · Enter 보내기, Shift+Enter 줄바꿈" : "예: 공유재산 사용허가 기간은 얼마까지 할 수 있나요?"}">${esc(GW.q)}</textarea>
-    <div class="gw-btns"><button type="button" class="primary small" id="gwSend" ${GW.busy ? "disabled" : ""}>${GW.busy ? "답을 받는 중…" : more ? "이어서 묻기" : "질문하기"}</button>
-      <span class="gw-live"><label class="vh" for="gwTarget">찾을 자료</label><select id="gwTarget">${["law", "prec", "expc", "admrul", "ordin"].map((k) => `<option value="${k}" ${GW.liveTarget === k ? "selected" : ""}>${LABEL[k]}</option>`).join("")}</select>
-      <button type="button" class="ghost small" id="gwLive" title="받은 DB에 없는 최신 자료를 국가법령정보센터에서 바로 찾기">법제처 실시간 검색</button></span></div>
-    ${GW.error ? `<p class="error" role="alert">${esc(GW.error)}</p>` : ""}
-    <div id="gwLiveOut">${gwLiveHtml()}</div></div>`;
-  const q = $("#gwQ");
-  q.oninput = () => { GW.q = q.value; };
-  q.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); gwAsk(); } };
-  $("#gwSend").onclick = gwAsk;
-  if ($("#gwNew")) $("#gwNew").onclick = () => { GW.turns = []; GW.q = ""; GW.error = ""; renderGw(); $("#gwQ").focus(); };
-  $("#gwTarget").onchange = (e) => { GW.liveTarget = e.target.value; };
-  $("#gwLive").onclick = gwLive;
-  bindGwRefs(box);
+  if (!$("#gwChat")) {
+    box.innerHTML = `<div class="gw-chat" id="gwChat">
+      <div class="gw-bar"><button type="button" class="ghost small" id="gwBack" title="검색 결과·본문으로">← 검색 결과</button><b>🤖 AI 질문</b> <span class="meta gw-who">JG AI · 회원 전용</span><span class="gw-bar-btns"><button type="button" class="ghost small" id="gwNew">＋ 새 대화</button></span></div>
+      <div class="gw-msgs" id="gwMsgs" tabindex="0" aria-live="polite" aria-label="대화"></div>
+      <form class="gw-composer" id="gwForm">
+        <div class="gw-input"><label class="vh" for="gwQ">질문</label>
+          <textarea id="gwQ" rows="1" maxlength="600" placeholder="법령에 대해 물어보세요"></textarea>
+          <button type="submit" class="primary gw-send" id="gwSend" aria-label="보내기" title="보내기 (Enter)">↑</button></div>
+        <div class="gw-tools"><label class="vh" for="gwTarget">실시간으로 찾을 자료</label><select id="gwTarget">${["law", "prec", "expc", "admrul", "ordin"].map((k) => `<option value="${k}" ${GW.liveTarget === k ? "selected" : ""}>${LABEL[k]}</option>`).join("")}</select>
+          <button type="button" class="ghost small" id="gwLive" title="입력한 낱말로, 받은 DB에 없는 최신 자료를 국가법령정보센터에서 바로 찾기">🔎 법제처 실시간 검색</button>
+          <span class="meta gw-hint">Enter 보내기 · Shift+Enter 줄바꿈</span></div>
+      </form></div>`;
+    const q = $("#gwQ");
+    const grow = () => { q.style.height = "auto"; q.style.height = Math.min(q.scrollHeight, 160) + "px"; };
+    q.value = GW.q; grow();
+    q.oninput = () => { GW.q = q.value; grow(); };
+    q.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); gwAsk(); } };
+    $("#gwForm").onsubmit = (e) => { e.preventDefault(); gwAsk(); };
+    $("#gwNew").onclick = () => { if (GW.busy) return; GW.turns = []; GW.q = ""; q.value = ""; grow(); renderGw(); q.focus(); };
+    $("#gwTarget").onchange = (e) => { GW.liveTarget = e.target.value; };
+    $("#gwLive").onclick = gwLive;
+    $("#gwBack").onclick = () => { S.rightTab = "doc"; S.listOnly = !S.chosen && S.results.length > 0; renderList(); renderReader(); };
+  }
+  const m = $("#gwMsgs"), atEnd = m.scrollHeight - m.scrollTop - m.clientHeight < 140;
+  m.innerHTML = gwMsgsHtml();
+  m.querySelectorAll("[data-gwsug]").forEach((b) => b.onclick = () => { $("#gwQ").value = GW.q = GW_SUGGEST[+b.dataset.gwsug]; gwAsk(); });
+  $("#gwSend").disabled = GW.busy; $("#gwNew").disabled = GW.busy || !GW.turns.length;
+  bindGwRefs(m);
+  if (atEnd || GW.stick) { m.scrollTop = m.scrollHeight; GW.stick = false; }
 }
+document.addEventListener("keydown", (e) => {  // Esc: back from the full-screen chat (a law window closes first)
+  if (e.key === "Escape" && document.body.classList.contains("gw-on") && !$("#dlg").open && $("#gwBack")) $("#gwBack").click();
+});
+function gwAlign() { const t = $("#gwQ"); if (t) t.focus({preventScroll: true}); }  // the chat is full screen
+// Keep the newest message in view while it grows, unless the reader scrolled up to read.
+function gwFollow() { const m = $("#gwMsgs"); if (m && m.scrollHeight - m.scrollTop - m.clientHeight < 160) m.scrollTop = m.scrollHeight; }
 function bindGwRefs(root) {
   root.querySelectorAll("[data-gwref]").forEach((b) => b.onclick = () => {
     const t = GW.turns[+b.dataset.gwturn], x = t && t.sources[+b.dataset.gwref];
@@ -3947,13 +4018,14 @@ function bindGwRefs(root) {
 async function gwAsk() {
   const q = (($("#gwQ") ? $("#gwQ").value : GW.q) || "").trim();
   if (!q || GW.busy) return;
-  const prior = GW.turns.filter((t) => t.answer && !t.error).slice(-GW_KEEP);
+  if ($("#gwQ")) { $("#gwQ").value = ""; $("#gwQ").style.height = "auto"; }
+  GW.stick = true;
+  const prior = GW.turns.filter((t) => t.kind !== "live" && t.answer && !t.error).slice(-GW_KEEP);
   const turn = {q, answer: "", sources: [], error: ""};
   const k = GW.turns.push(turn) - 1;
   GW.q = ""; GW.busy = true; GW.error = "";
   renderGw();
-  const scroll = () => { const el = document.getElementById("gwTurn" + k); if (el) el.scrollIntoView({block: "nearest"}); };
-  scroll();
+  const scroll = () => gwFollow();
   try {
     const last = prior[prior.length - 1];
     turn.sources = await gwSources(last ? `${last.q} ${q}` : q, last ? [...new Set(last.sources.map((x) => x.mst))] : []);
@@ -3963,6 +4035,7 @@ async function gwAsk() {
       turn.answer = String(acc || "");
       const a = document.querySelector(`#gwTurn${k} .gw-answer`);
       if (a) { a.innerHTML = gwAnswerHtml(turn.answer, turn.sources, k, false); bindGwRefs(a); }
+      gwFollow();
     };
     // Too much for the Gateway (size, time) fails: the same question again with fewer, shorter articles and less history.
     const errors = [];
@@ -3996,18 +4069,21 @@ async function gwAsk() {
   GW.busy = false;
   gwLoginLabel();
   renderGw();
-  requestAnimationFrame(() => { scroll(); const t = $("#gwQ"); if (t) t.focus({preventScroll: true}); });
+  requestAnimationFrame(() => { gwFollow(); const t = $("#gwQ"); if (t) t.focus({preventScroll: true}); });
 }
 // 법제처 실시간 검색: the Gateway asks 국가법령정보센터 (key kept on the Gateway); results not yet in the DB.
 async function gwLive() {
-  const q = (GW.q = ($("#gwQ") ? $("#gwQ").value : GW.q).trim()) || S.query;
-  if (!q) { GW.error = "찾을 낱말을 질문 칸에 넣으세요."; renderGw(); return; }
-  GW.live = {busy: true, q, target: GW.liveTarget, items: []}; GW.error = "";
+  const q = (($("#gwQ") ? $("#gwQ").value : GW.q) || "").trim() || S.query;
+  if (!q) { $("#gwQ").placeholder = "실시간으로 찾을 낱말을 먼저 넣으세요 (예: 건축법)"; $("#gwQ").focus(); return; }
+  if ($("#gwQ")) { $("#gwQ").value = ""; GW.q = ""; }
+  const t = {kind: "live", q, target: GW.liveTarget, busy: true, items: [], sources: []};
+  GW.turns.push(t); GW.stick = true;
   renderGw();
   try {
-    const data = await window.JG.ext["law-search"]({query: q, target: GW.liveTarget, display: 30});
-    GW.live = {busy: false, q, target: GW.liveTarget, items: liveItems(data, GW.liveTarget), total: liveTotal(data)};
-  } catch (e) { GW.live = null; GW.error = gwError(e); }
+    const data = await window.JG.ext["law-search"]({query: q, target: t.target, display: 30});
+    t.items = liveItems(data, t.target); t.total = liveTotal(data);
+  } catch (e) { t.error = gwError(e); }
+  t.busy = false;
   gwLoginLabel();
   renderGw();
 }
@@ -4039,11 +4115,10 @@ function liveLink(x, target) {
   if (target === "prec" && x.no) return base + "판례/(" + encodeURIComponent(x.no) + ")";
   return "https://www.law.go.kr/";
 }
-function gwLiveHtml() {
-  const L = GW.live;
-  if (!L) return "";
-  if (L.busy) return `<p class="meta">국가법령정보센터에서 ‘${esc(L.q)}’ 찾는 중…</p>`;
-  return `<section class="gw-live-out"><h3>법제처 실시간 검색 · ${esc(LABEL[L.target])} ‘${esc(L.q)}’ <span class="meta">${L.total != null ? n(+L.total) + "건 중 " : ""}${n(L.items.length)}건</span></h3>
+function gwLiveHtml(L) {
+  if (L.busy) return `<span class="gw-typing" aria-label="찾는 중"><i></i><i></i><i></i></span>`;
+  if (L.error) return `<p class="error" role="alert">${esc(L.error)}</p>`;
+  return `<section class="gw-live-out"><h3>국가법령정보센터 실시간 검색 결과 <span class="meta">${L.total != null ? n(+L.total) + "건 중 " : ""}${n(L.items.length)}건</span></h3>
     ${L.items.length ? `<ul>${L.items.map((x) => { const inDb = L.target === "law" && lawByName(x.title);
       return `<li><b>${esc(x.title)}</b> <span class="meta">${esc([x.kind, x.org, x.no, x.date].filter(Boolean).join(" · "))}</span>
         ${inDb ? `<button type="button" class="ghost small" data-gwdb="${inDb.mst}">받은 DB에서 열기</button>` : `<span class="type-label">받은 DB에 없음</span>`}
