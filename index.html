@@ -3752,14 +3752,35 @@ if (GW_ON) {
   // The login button shows at once: "AI 연결 중…", then 로그인 — or, when something fails, why.
   $("#gwLogin").hidden = false; $("#gwLogin").textContent = "AI 연결 중…";
   let scriptError = "";
-  const onErr = (e) => { if (/tae-ai-client|jg-connect/.test(e.filename || "")) scriptError = e.message || "스크립트 오류"; };
+  const onErr = (e) => { if (/tae-ai-client|jg-connect/.test(e.filename || "") || (e.message || "").startsWith("Script error")) GW.scriptError = scriptError = e.message || "스크립트 오류"; };
   window.addEventListener("error", onErr);
-  loadScript(GW_SDK + "?v=" + Math.floor(Date.now() / 3600000))
-    .then(() => { if (typeof window.TaeAI !== "function") throw new Error("tae-ai-client.js를 불러왔지만 TaeAI가 없습니다(SDK 버전 확인, v1.2 이상)."); })
+  loadSdk()
     .then(() => loadScript("jg-connect.js?v=" + Math.floor(Date.now() / 3600000)))
     .then(() => { if (!(window.JG && window.JG.ai)) throw new Error("jg-connect.js 실행 오류: " + (scriptError || "JG가 만들어지지 않았습니다.")); gwReady(); })
     .catch((e) => gwFailed(e && e.message || String(e)))
     .finally(() => window.removeEventListener("error", onErr));
+}
+// The SDK as a plain script (with and without ?v=), then as a module (export class TaeAI); each failure is kept for the message.
+async function loadSdk() {
+  const tries = [];
+  for (const src of [GW_SDK + "?v=" + Math.floor(Date.now() / 3600000), GW_SDK]) {
+    if (typeof window.TaeAI === "function") break;
+    try { await loadScript(src); if (typeof window.TaeAI !== "function") tries.push(`${src}: 불러왔지만 TaeAI가 없음${GW.scriptError ? " (" + GW.scriptError + ")" : ""}`); }
+    catch (e) { tries.push(e.message); }
+  }
+  if (typeof window.TaeAI !== "function") {
+    try {
+      const m = await import(GW_SDK);
+      const C = m.TaeAI || (m.default && (m.default.TaeAI || m.default));
+      if (typeof C === "function") { window.TaeAI = C; if (m.TaeAIError) window.TaeAIError = m.TaeAIError; }
+      else tries.push("모듈로 불러왔지만 TaeAI 내보내기가 없음");
+    } catch (e) { tries.push("모듈로 불러오기 실패: " + (e && e.message || e)); }
+  }
+  if (typeof window.TaeAI !== "function") {
+    // Is api.jg.it.kr reachable at all? (an opaque answer is enough to know)
+    const reach = await fetch(GW_SDK, {mode: "no-cors", cache: "no-store"}).then(() => "api.jg.it.kr에는 닿음", () => "api.jg.it.kr에 닿지 않음(서버 꺼짐·주소·네트워크 차단)");
+    throw new Error(`${reach} · ` + tries.join(" / "));
+  }
 }
 function gwReady() {
   GW.ready = true; GW.failed = "";
@@ -3777,9 +3798,11 @@ function gwLoginLabel() { const b = $("#gwLogin"); let on = false; try { on = wi
 $("#gwLogin").onclick = async () => {
   if (GW.failed) {
     openDialog("AI 연결 안 됨", `<p>JG Gateway에 연결하지 못했습니다. 검색은 그대로 쓸 수 있습니다.</p>
-      <p class="error">${esc(GW.failed)}</p>
+      <p class="error" style="word-break:break-all">${esc(GW.failed)}</p>
+      <p><button type="button" class="ghost small" id="gwCopyWhy">이 내용 복사</button></p>
       <ul><li>새로고침(Ctrl+F5)을 해 보세요.</li><li>회사·학교 네트워크나 광고 차단 확장이 <span class="mono">api.jg.it.kr</span>을 막는지 확인하세요.</li>
       <li>Gateway(Mac mini)가 켜져 있는지, 관리자 화면에서 이 앱의 허용 Origin이 <span class="mono">https://law.jg.it.kr</span>인지 확인하세요.</li></ul>`);
+    $("#gwCopyWhy").onclick = (e) => { navigator.clipboard.writeText(`${location.href}\n${navigator.userAgent}\n${GW.failed}`).then(() => { e.target.textContent = "복사했습니다"; }, () => {}); };
     return;
   }
   if (!GW.ready) return;
