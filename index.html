@@ -197,6 +197,11 @@ button.filter-chip {padding:6px 14px;min-height:36px;font-size:14px;}
 .pick-names {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;}
 .workspace {display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:16px;align-items:start;}
 .workspace.list-only {grid-template-columns:minmax(0,1fr);}
+.list-busy {display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--line);color:var(--brand);font-size:15px;}
+.list-busy[hidden] {display:none;}
+.busy-count {color:var(--ink-muted);font-variant-numeric:tabular-nums;font-size:14px;}
+.spin {flex:none;width:20px;height:20px;border-radius:50%;border:3px solid color-mix(in srgb,var(--brand) 22%,transparent);border-top-color:var(--brand);animation:jgSpin .8s linear infinite;}
+@keyframes jgSpin {to {transform:rotate(360deg);}}
 .upd-line {white-space:normal;}
 .upd-list {margin:0;padding-left:20px;display:grid;gap:4px;max-height:260px;overflow-y:auto;}
 .upd-hist {border-collapse:collapse;font-size:13px;width:100%;}
@@ -575,6 +580,7 @@ kbd {font-family:var(--font-sans);font-size:12px;color:var(--ink-muted);border:1
   <div class="workspace">
     <section class="panel result-panel" aria-label="검색 결과">
       <h2 id="listTitle">결과 <span></span></h2>
+      <div class="list-busy" id="listBusy" role="status" aria-live="polite" hidden></div>
       <div id="listNote"></div>
       <div class="result-items" id="list"></div>
     </section>
@@ -1773,14 +1779,22 @@ async function caseParts(kind, id) {
   const shard = textShards(kind).find(([a, b]) => Number(a) <= v && v <= Number(b));
   return shard ? ((await load(shard[2]))[id] || null) : null;
 }
-function progress(label, done, total) { S.loading = `${label} <span class="bar"><i style="width:${Math.round(done / Math.max(1, total) * 100)}%"></i></span>${done}/${total}`; renderNotice(); }
-function finish(text) { S.loading = text || ""; renderNotice(); }
+function progress(label, done, total) { S.loading = `${label} <span class="bar"><i style="width:${Math.round(done / Math.max(1, total) * 100)}%"></i></span>${done}/${total}`; renderNotice(); busy(done, total); }
+function finish(text) { S.loading = text || ""; renderNotice(); const b = $("#listBusy"); if (b) b.hidden = true; }
+// 검색 중: a spinning circle (with how far, when known) until the search is done.
+function busy(done, total) {
+  const b = $("#listBusy");
+  if (!b) return;
+  b.hidden = false;
+  b.innerHTML = `<span class="spin" aria-hidden="true"></span><b>검색 중…</b>${total ? ` <span class="busy-count">${n(done)}/${n(total)}</span>` : ""}`;
+}
 const lawItem = (L, hits, snip) => ({type: "law", mst: L.mst, L, hits, snip});
 async function runSearch() {
   if (!S.index) return;
   const run = ++S.run, q = S.query, qc = compact(q);
   const stale = () => run !== S.run;
   S.shown = 80; S.results = []; finish("");
+  if (qc || S.selected.length || S.kind === "ordin") busy();
   if (S.kind === "ordin" && !S.selected.length) return searchOrdinances(run);
   if (S.selected.length) {
     // 법령 필터: search only inside the chosen laws (all of them listed; matches first).
@@ -1793,10 +1807,10 @@ async function runSearch() {
       items.push(lawItem(L, hits, snip));
     }
     S.results = qc ? items.sort((a, b) => b.hits - a.hits) : items;
-    if (qc) finish(`선택한 법령 ${items.length}개 · 조문 ${n(items.reduce((a, i) => a + i.hits, 0))}곳`);
+    finish(qc ? `선택한 법령 ${items.length}개 · 조문 ${n(items.reduce((a, i) => a + i.hits, 0))}곳` : "");
     renderList(); autoOpen(); return;
   }
-  if (!qc) { renderList(); renderReader(); return; }
+  if (!qc) { finish(""); renderList(); renderReader(); return; }
   if (S.kind === "all" || S.kind === "law") {
     // Names first: the laws with every word of the query in their name (with their whole 법률·시행령·
     // 시행규칙 family) and, under 전체, the 자치법규 whose name or 지자체 has the words. The article
@@ -1908,9 +1922,10 @@ async function searchCases(run, kind, q) {
   finish(`${LABEL[kind]} ${n(S.results.length)}건`);
 }
 async function searchOrdinances(run) {
-  if (!(S.index.ordinances && S.index.ordinances.listed) || !S.region.sido) { renderList(); return; }
+  if (!(S.index.ordinances && S.index.ordinances.listed) || !S.region.sido) { finish(""); renderList(); return; }
   const rows = await metaOf("ordin");
   if (run !== S.run) return;
+  finish("");
   const qc = compact(S.query);
   S.results = rows.filter((r) => r[3] === S.region.sido && (!S.region.sigungu ? !r[4] : r[4] === S.region.sigungu)
     && (!S.ordKind || r[5] === S.ordKind) && (!qc || compact(r[1]).includes(qc)))
