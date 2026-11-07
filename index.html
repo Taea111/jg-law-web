@@ -404,36 +404,11 @@ html,body {overflow-anchor:none;}
 @media (min-width:811px) { .workspace:not(.list-only) > .result-panel {position:sticky;top:calc(var(--sticky-h) + 8px);z-index:2;} }
 .gw-fb {display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);}
 .gw-fb button {min-height:32px;min-width:36px;}
-.gw-pick ul {list-style:none;margin:8px 0;padding:0;display:grid;gap:6px;}
-.gw-pick li {border:1px solid var(--line);border-radius:10px;padding:8px 10px;}
-.gw-pick li.on {border-color:var(--brand);}
-.gw-pick .row {display:flex;align-items:flex-start;gap:8px;}
-.gw-pick label {flex:1;min-width:0;display:flex;gap:8px;align-items:flex-start;cursor:pointer;min-height:32px;overflow-wrap:anywhere;}
-.gw-pick input {margin-top:3px;width:18px;height:18px;flex:none;}
-.gw-pick .row button {min-height:32px;flex:none;}
-.gw-pick .snip {margin:4px 0 0 26px;font-size:13px;overflow-wrap:anywhere;}
-.gw-pick-btns {display:flex;flex-wrap:wrap;gap:6px;}
-.gw-pick-btns button {min-height:36px;}
 .gw-laws {display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 2px 8px;}
 .gw-laws .gw-law {display:inline-flex;align-items:center;gap:2px;max-width:100%;border:1px solid var(--brand);border-radius:999px;padding:2px 4px 2px 10px;font-size:13px;}
 .gw-laws .gw-law span {overflow-wrap:anywhere;}
-.gw-laws .gw-law button {min-height:28px;min-width:28px;border:0;background:transparent;cursor:pointer;font:inherit;}
-.gw-law-add {position:relative;flex:1 1 200px;min-width:0;}
-.gw-law-add input {width:100%;min-height:36px;font-size:16px;padding:4px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-100);color:inherit;}
-.gw-law-sug {position:absolute;left:0;right:0;bottom:calc(100% + 4px);z-index:5;display:grid;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface-100);box-shadow:0 6px 20px rgba(0,0,0,.15);}
-.gw-law-sug button {text-align:left;min-height:36px;padding:6px 10px;border:0;border-bottom:1px solid var(--line);background:transparent;color:inherit;cursor:pointer;font:inherit;overflow-wrap:anywhere;}
-.gw-need-laws .gw-pick-btns {margin-top:8px;}
-dialog.gw-law-dlg {width:min(620px,calc(100% - 24px));}
-.gw-law-dlg .box-body {padding:14px 22px 20px;display:grid;gap:10px;}
-.gw-law-dlg textarea {width:100%;font-size:16px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-100);color:inherit;resize:vertical;}
-.gw-law-dlg p {margin:0;}
-.gw-dlg-chosen {display:flex;flex-wrap:wrap;gap:6px;}
-.gw-dlg-chosen .gw-law {display:inline-flex;align-items:center;gap:2px;max-width:100%;border:1px solid var(--brand);border-radius:999px;padding:2px 4px 2px 10px;font-size:14px;}
-.gw-dlg-chosen .gw-law button {min-height:28px;min-width:28px;border:0;background:transparent;color:inherit;cursor:pointer;font:inherit;}
-.gw-law-dlg .gw-suggest .filter-chip[aria-pressed="true"] {background:var(--brand);border-color:var(--brand);color:#fff;}
-.gw-dlg-sug {bottom:auto;top:calc(100% + 4px);}
-.gw-law-dlg .gw-pick-btns button {min-height:40px;}
-.gw-need-laws .filter-chip[aria-pressed="true"] {background:var(--brand);border-color:var(--brand);color:#fff;}
+.gw-laws .gw-law button {min-height:28px;min-width:28px;border:0;background:transparent;color:inherit;cursor:pointer;font:inherit;}
+.gw-scope {margin:0 0 6px;font-size:12.5px;overflow-wrap:anywhere;}
 .gw-fb button[aria-pressed="true"] {background:var(--brand);border-color:var(--brand);color:#fff;}
 .gw-log-note {font-size:12.5px;margin:4px 2px 0;}
 .case-panel {top:calc(var(--sticky-h) + 12px) !important;max-height:calc(100dvh - var(--sticky-h) - var(--dock-h) - 24px) !important;}
@@ -1722,7 +1697,7 @@ function renderFilterBar() {
     <button type="button" class="filter-add" id="fAdd">+ 법령 추가</button>
     ${S.selected.length ? `<span class="filter-on">🔒 고른 법령 ${S.selected.length}개 안에서만 찾습니다 (AI에게 묻기도 같음)</span>` : ""}
     ${S.selected.length && GW.ready ? `<button type="button" class="secondary small" id="filterGw">🤖 이 법령으로 AI에게 묻기</button>` : ""}</div>`;
-  if ($("#filterGw")) $("#filterGw").onclick = () => gwLawDialog(S.query, S.selected.map((m) => S.byMst.get(m)).filter(Boolean).map((L) => L.title));
+  if ($("#filterGw")) $("#filterGw").onclick = () => gwAskNow(S.query, S.selected.map((m) => S.byMst.get(m)).filter(Boolean).map((L) => L.title));
   $("#fAll").onclick = () => { if (S.selected.length) { S.selected = []; afterFilter(); } };
   el.querySelectorAll("[data-f]").forEach((b) => b.onclick = () => toggleLaw(b.dataset.f));
   el.querySelectorAll("[data-x]").forEach((b) => b.onclick = () => removeFilter(b.dataset.x));
@@ -1754,7 +1729,7 @@ function renderPickBar() {
     ${GW.ready ? `<button type="button" class="secondary small" id="pickedGw">🤖 체크한 법령으로 AI에게 묻기</button>` : ""}
     <button type="button" class="ghost small" id="clearPicked">체크 해제</button></div>`;
   $("#applyPicked").onclick = applyPicked;
-  if ($("#pickedGw")) $("#pickedGw").onclick = () => gwLawDialog(S.query, [...S.picked.values()].map((L) => L.title));
+  if ($("#pickedGw")) $("#pickedGw").onclick = () => gwAskNow(S.query, [...S.picked.values()].map((L) => L.title));
   $("#clearPicked").onclick = () => { S.picked.clear(); S.notebook = null; if (S.rightTab === "notebook") S.rightTab = "doc"; renderPickBar(); renderList(); renderReader(); };
 }
 function applyPicked() {
@@ -1991,7 +1966,7 @@ function renderList() {
     ${S.results.length && !S.listOnly && S.chosen ? `<button type="button" class="ghost small list-wide" id="listWide" title="본문을 닫고 결과만 넓게 보기">⤢ 결과만 보기</button>` : ""}
     ${S.listOnly && !PUBLIC && S.results.length ? `<button type="button" class="ghost small list-wide" id="listAi">🤖 Claude · AI 요약 열기</button>` : ""}
     ${S.listOnly && GW.ready && S.results.length ? `<button type="button" class="ghost small list-wide" id="listGw">🤖 AI에게 묻기</button>` : ""}`;
-  if ($("#listGw")) $("#listGw").onclick = () => gwLawDialog(S.query, gwPresetLaws());
+  if ($("#listGw")) $("#listGw").onclick = () => gwAskNow(S.query, gwSearchLaws());
   if ($("#listAi")) $("#listAi").onclick = () => { S.listOnly = false; S.rightTab = S.query ? "ai" : "ask"; renderList(); renderReader(); };
   if ($("#listWide")) $("#listWide").onclick = () => { S.listOnly = true; S.rightTab = "doc"; renderList(); renderReader(); };
   if (!S.results.length) {
@@ -4082,7 +4057,7 @@ $("#gwLogin").onclick = async () => {
   } catch (e) { flash("로그인하지 못했습니다: " + gwError(e)); }
   gwLoginLabel();
 };
-$("#gwAskBtn").onclick = () => gwLawDialog($("#q").value.trim(), gwPresetLaws());
+$("#gwAskBtn").onclick = () => gwAskNow($("#q").value.trim(), gwSearchLaws());
 function openGw(q) {
   if (q) GW.q = q;
   S.listOnly = false; S.split = false; S.rightTab = "gw";
@@ -4158,11 +4133,9 @@ const GW_SUGGEST = ["공유재산 사용허가 기간은 얼마까지 할 수 �
 function gwTurnHtml(t, k) {
   if (t.kind === "live") return `<div class="gw-msg me"><div class="gw-bubble">🔎 법제처 실시간 검색: ${esc(LABEL[t.target])} ‘${esc(t.q)}’</div></div>
     <div class="gw-msg ai" id="gwTurn${k}"><div class="gw-avatar" aria-hidden="true">🔎</div><div class="gw-bubble">${gwLiveHtml(t)}</div></div>`;
-  if (t.needLaws) return `<div class="gw-msg me"><div class="gw-bubble">${esc(t.q)}</div></div>
-    <div class="gw-msg ai" id="gwTurn${k}"><div class="gw-avatar" aria-hidden="true">📚</div><div class="gw-bubble">${gwNeedLawsHtml(t, k)}</div></div>`;
-  return `<div class="gw-msg me"><div class="gw-bubble">${esc(t.q)}${t.laws && t.laws.length ? `<div class="meta">📚 ${esc(t.laws.length > 1 ? `${t.laws[0]} 외 ${t.laws.length - 1}개` : t.laws[0])}</div>` : ""}</div></div>
+  return `<div class="gw-msg me"><div class="gw-bubble">${esc(t.q)}</div></div>
     <div class="gw-msg ai" id="gwTurn${k}"><div class="gw-avatar" aria-hidden="true">🤖</div><div class="gw-bubble">
-      <div class="gw-answer">${t.answer ? gwAnswerHtml(t.answer, t.sources, k, t.done) : t.error ? "" : t.pick && !t.pick.done ? gwPickHtml(t, k) : '<span class="gw-typing" aria-label="답을 받는 중"><i></i><i></i><i></i></span>'}</div>
+      <div class="gw-scope-slot">${gwScopeHtml(t.scope)}</div><div class="gw-answer">${t.answer ? gwAnswerHtml(t.answer, t.sources, k, t.done) : t.error ? "" : '<span class="gw-typing" aria-label="답을 받는 중"><i></i><i></i><i></i></span>'}</div>
       ${t.error ? `<p class="error" role="alert">${esc(t.error)}</p>` : ""}${t.note ? `<p class="meta">${esc(t.note)}</p>` : ""}${gwFbHtml(t, k)}
       ${t.sources.length && (t.answer || t.done) ? `<details class="gw-src"><summary>근거 조문 ${t.sources.length}개</summary><ol>${t.sources.map((x, i) => `<li><button type="button" class="link-btn" data-gwturn="${k}" data-gwref="${i}">${esc(x.title)}</button></li>`).join("")}</ol></details>` : ""}
     </div></div>`;
@@ -4212,7 +4185,7 @@ function renderGw() {
   gwHoursPaint(); gwLoginLabel();
   m.querySelectorAll("[data-gwsug]").forEach((b) => b.onclick = () => { $("#gwQ").value = GW.q = GW_SUGGEST[+b.dataset.gwsug]; gwAsk(); });
   $("#gwSend").disabled = GW.busy; $("#gwNew").disabled = GW.busy || !GW.turns.length;
-  bindGwRefs(m); bindGwFb(m); bindGwPick(m); bindGwNeedLaws(m);
+  bindGwRefs(m); bindGwFb(m);
   let on = false; try { on = window.JG.isLoggedIn(); } catch (e) { /* not ready */ }
   if (on && GW.logOn === undefined && window.JG.ai) { GW.logOn = false; window.JG.ai.appInfo().then((i) => { GW.logOn = !!(i && i.ai_log); const n = $("#gwLogNote"); if (n) n.hidden = !GW.logOn; }, () => { GW.logOn = undefined; }); }
   const ln = $("#gwLogNote"); if (ln) ln.hidden = !GW.logOn;
@@ -4238,206 +4211,38 @@ function bindGwRefs(root) {
 }
 // 맥미니 법령 검색으로 묻기: 근거 조문은 Gateway 가 고르고(meta.retrieved_refs), 이 화면의 법령·조문으로 이어 [n]을 누르면 그 조문이 뜬다.
 // 서버 색인에서 하나도 못 찾으면 false → 홈페이지 검색 방식으로 다시.
-// AI 질문은 고른 법령(여러 개, 시행령·시행규칙 함께) 안에서만 찾는다. 안 고르고 물으면 질문 낱말로 찾은 법령을 제안한다.
+// AI 질문은 법령을 따로 고르지 않는다: 맥미니가 질문에 맞는 법령(또는 검색 화면에서 고르거나 체크한 법령)을 기준으로
+// 법령 연계도 범위(법률·시행령·시행규칙 + 「」로 인용하는 법령 + 인용되는 법령) 안에서 찾아 바로 답하고, 찾은 범위를 답 위에 작게 보여 준다.
 const gwLawBase = (t) => String(t || "").replace(/\s*(시행령|시행규칙)$/, "").trim();
-GW.laws = (store.get("gwLaws", []) || []).filter((x) => typeof x === "string").slice(0, 10);
-function gwLawsSave() { store.set("gwLaws", GW.laws); }
-function gwLawAdd(name) { const b = gwLawBase(name); if (b && !GW.laws.includes(b) && GW.laws.length < 10) { GW.laws.push(b); gwLawsSave(); } }
-function gwLawNames() {   // 고를 수 있는 법령 이름 (시행령·시행규칙은 법률 이름으로 묶음)
-  if (!GW.lawNames || GW.lawNames.n !== S.laws.length) GW.lawNames = {n: S.laws.length, list: [...new Set(S.laws.map((L) => gwLawBase(L.title)))]};
-  return GW.lawNames.list;
+GW.laws = [];   // 기준 법령 (검색 화면에서 고르거나 체크한 법령). 비어 있으면 맥미니가 질문으로 고른다
+function gwLawsInit() {}
+function gwLawsPaint() {   // 질문 칸 위: 지금 찾는 범위 한 줄 (기준 법령이 있으면 × 로 자동으로 되돌림)
+  const box = $("#gwLaws"); if (!box) return;
+  box.innerHTML = GW.laws.length
+    ? `<span class="meta">🔎 기준 법령</span>${GW.laws.map((n, i) => `<span class="gw-law"><span>${esc(n)}</span><button type="button" data-gwlawx="${i}" aria-label="${esc(n)} 빼기" title="빼기">×</button></span>`).join("")}<span class="meta">+ 법령 연계도</span>`
+    : `<span class="meta">🔎 질문에 맞는 법령을 맥미니가 골라, 그 법령의 연계도(시행령·시행규칙·인용 법령) 안에서 찾아요</span>`;
+  box.querySelectorAll("[data-gwlawx]").forEach((b) => b.onclick = () => { if (GW.busy) return; GW.laws.splice(+b.dataset.gwlawx, 1); gwLawsPaint(); });
 }
-function gwLawsInit() {
-  const box = $("#gwLaws");
-  box.innerHTML = `<span class="meta">📚 찾을 법령</span><span id="gwLawChips" style="display:contents"></span>
-    <div class="gw-law-add"><label class="vh" for="gwLawIn">법령 추가</label><input id="gwLawIn" autocomplete="off" placeholder="법령 이름으로 추가 (여러 개 가능)"><div class="gw-law-sug" id="gwLawSug" hidden></div></div>`;
-  gwLawTypeahead($("#gwLawIn"), $("#gwLawSug"), () => GW.laws, (n) => { gwLawAdd(n); gwLawsPaint(); });
+function gwScopeHtml(sc) {   // 답 위: 찾은 범위
+  if (!sc || !sc.center || !sc.center.length) return "";
+  const linked = sc.linked || [];
+  return `<p class="meta gw-scope" title="${esc([...(sc.core || []), ...linked].join("\n"))}">🔎 찾은 범위: ${esc(sc.center.join(" · "))} (법률·시행령·시행규칙)${linked.length ? ` + 연계 법령 ${linked.length}개` : ""}</p>`;
 }
-// 법령 이름 입력 칸: 치는 대로 법령 목록(법률 이름) 8개 · 누르거나 Enter 로 추가
-function gwLawTypeahead(inp, sug, taken, add) {
-  const show = () => {
-    const w = inp.value.replace(/\s/g, "");
-    if (!w) { sug.hidden = true; return; }
-    const hit = gwLawNames().filter((n) => !taken().includes(n) && n.replace(/\s/g, "").includes(w))
-      .sort((a, b) => (b.replace(/\s/g, "").startsWith(w) - a.replace(/\s/g, "").startsWith(w)) || a.length - b.length).slice(0, 8);
-    sug.innerHTML = hit.length ? hit.map((n) => `<button type="button" data-gwlawadd="${esc(n)}">${esc(n)}</button>`).join("") : `<button type="button" disabled>맞는 법령이 없어요</button>`;
-    sug.hidden = false;
-    sug.querySelectorAll("[data-gwlawadd]").forEach((b) => b.onmousedown = (e) => { e.preventDefault(); add(b.dataset.gwlawadd); inp.value = ""; sug.hidden = true; inp.focus(); });
-  };
-  inp.oninput = show;
-  inp.onkeydown = (e) => {
-    if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); const f = sug.querySelector("[data-gwlawadd]"); if (f) { add(f.dataset.gwlawadd); inp.value = ""; sug.hidden = true; } }
-    if (e.key === "Escape" && !sug.hidden) { e.stopPropagation(); e.preventDefault(); sug.hidden = true; }
-  };
-  inp.onblur = () => setTimeout(() => { sug.hidden = true; }, 150);
+// 'AI에게 묻기': 검색 화면에서 고르거나 체크한 법령이 있으면 그 법령을 기준으로, 없으면 질문으로 맥미니가 골라 바로 묻는다
+function gwAskNow(q, laws = []) {
+  GW.laws = [...new Set(laws.map(gwLawBase))].filter(Boolean).slice(0, 10);
+  openGw(q || "");
+  requestAnimationFrame(() => { gwLawsPaint(); const t = $("#gwQ"); if (q) { if (t) t.value = q; gwAsk(); } else if (t) t.focus(); });
 }
-// 'AI에게 묻기' 를 누르면 먼저 법령을 고른다 (여러 개, 시행령·시행규칙 함께) → 고른 법령 안에서만 찾아 답한다.
-// 후보: 검색 화면에서 고르거나 체크한 법령 · 지금 검색 결과의 법령 · 질문 낱말이 이름에 든 법령 · (로그인했으면) 맥미니가 질문으로 찾은 법령
-function gwLawDialogSugs(q, preset) {
-  const out = [], add = (n, why) => { const b = gwLawBase(n); if (b && !out.some((x) => x.law === b)) out.push({law: b, why}); };
-  preset.forEach((n) => add(n, "고른 법령"));
-  (S.results || []).forEach((r) => { const L = r && r.mst && S.byMst.get(r.mst); if (L && out.length < 10) add(L.title, "검색 결과"); });
-  return out.slice(0, 12);
-}
-async function gwLawWordSugs(q) {   // 질문 낱말이 조문에 많이 든 법령 (홈페이지 낱말 색인 — 로그인 없이). 이름에 낱말이 있으면 더 셈
-  const words = gwWords(String(q || "")).map(compact); if (!words.length) return [];
-  const score = new Map();
-  for (const w of words) {
-    const cand = await candidateMsts(w);
-    if (cand) for (const m of cand) score.set(m, (score.get(m) || 0) + 1);
-    for (const L of S.laws) if (compact(L.title).includes(w)) score.set(L.mst, (score.get(L.mst) || 0) + 3);
-  }
-  const out = [];
-  [...score].map(([m, v]) => [S.byMst.get(m), v]).filter(([L]) => L).sort((a, b) => b[1] - a[1] || a[0].level - b[0].level || b[0].local - a[0].local)
-    .forEach(([L]) => { const b = gwLawBase(L.title); if (!out.includes(b) && out.length < 6) out.push(b); });
-  return out;
-}
-async function gwLawDialog(q, preset = []) {
-  // AI 질문은 회원 전용: 로그인 안 했으면 선택 창을 열기 전에 로그인부터 (선택 창 위에서는 로그인 창을 누를 수 없음) — 맥미니 법령 추천도 함께 받는다
-  let on = false, server = null; try { on = window.JG.isLoggedIn(); } catch (e) { /* not ready */ }
-  if (!on && q && window.JG.ai && window.JG.ai.lawSuggest) {
-    try { const r = await window.JG.ai.lawSuggest(q); server = (r && r.laws) || []; }
-    catch (e) { if (e && /CANCELLED/i.test(e.code || "")) return; server = []; }
-  }
-  let dlg = $("#gwLawDlg");
-  if (!dlg) {
-    dlg = document.createElement("dialog"); dlg.className = "box gw-law-dlg"; dlg.id = "gwLawDlg"; document.body.append(dlg);
-  }
-  const st = {q, chosen: [...new Set(preset.map(gwLawBase))].slice(0, 10), sugs: gwLawDialogSugs(q, preset), server: false};
-  const paint = () => {
-    const n = st.chosen.length;
-    dlg.innerHTML = `<div class="box-head"><h2>🤖 AI에게 묻기 · 법령 고르기</h2><button type="button" class="ghost small" data-gwdx>닫기</button></div>
-      <div class="box-body">
-        <label class="meta" for="gwDlgQ">질문</label>
-        <textarea id="gwDlgQ" rows="2" maxlength="600" placeholder="법령에 대해 물어보세요">${esc(st.q)}</textarea>
-        <p class="meta">어느 법령에서 찾을까요? 고른 법령(시행령·시행규칙 함께) 안에서만 찾아 답해서 더 정확해요. 여러 개 골라도 돼요.</p>
-        <div class="gw-dlg-chosen">${n ? st.chosen.map((x, i) => `<span class="gw-law"><span>${esc(x)}</span><button type="button" data-gwdrm="${i}" aria-label="${esc(x)} 빼기" title="빼기">×</button></span>`).join("") : `<span class="meta">아직 고른 법령이 없어요</span>`}</div>
-        ${st.sugs.length ? `<p class="meta">추천 법령 (누르면 추가·빼기)</p><div class="gw-suggest">${st.sugs.map((x, i) => `<button type="button" class="filter-chip" data-gwds="${i}" aria-pressed="${st.chosen.includes(x.law)}" title="${esc(x.why)}">${esc(x.law)}</button>`).join("")}</div>` : ""}
-        ${st.server === "loading" ? `<p class="meta">맥미니가 질문에 맞는 법령을 찾는 중…</p>` : ""}
-        <div class="gw-law-add gw-dlg-add"><label class="vh" for="gwDlgIn">법령 추가</label><input id="gwDlgIn" autocomplete="off" placeholder="법령 이름으로 찾아 추가"><div class="gw-law-sug gw-dlg-sug" id="gwDlgSug" hidden></div></div>
-        <div class="gw-pick-btns"><button type="button" class="primary" data-gwdgo ${n && st.q.trim() ? "" : "disabled"}>고른 법령${n ? ` ${n}개` : ""}로 AI에게 묻기</button>
-          <button type="button" class="ghost" data-gwdx>취소</button></div>
-      </div>`;
-    const ta = dlg.querySelector("#gwDlgQ");
-    ta.oninput = () => { st.q = ta.value; dlg.querySelector("[data-gwdgo]").disabled = !(st.chosen.length && st.q.trim()); };
-    dlg.querySelectorAll("[data-gwdx]").forEach((b) => b.onclick = () => dlg.close());
-    dlg.querySelectorAll("[data-gwdrm]").forEach((b) => b.onclick = () => { st.chosen.splice(+b.dataset.gwdrm, 1); paint(); });
-    dlg.querySelectorAll("[data-gwds]").forEach((b) => b.onclick = () => { const L = st.sugs[+b.dataset.gwds].law; st.chosen = st.chosen.includes(L) ? st.chosen.filter((x) => x !== L) : [...st.chosen, L].slice(0, 10); paint(); });
-    gwLawTypeahead(dlg.querySelector("#gwDlgIn"), dlg.querySelector("#gwDlgSug"), () => st.chosen, (L) => { if (!st.chosen.includes(L) && st.chosen.length < 10) st.chosen.push(L); paint(); dlg.querySelector("#gwDlgIn").focus(); });
-    dlg.querySelector("[data-gwdgo]").onclick = () => {
-      if (!st.chosen.length || !st.q.trim()) return;
-      GW.laws = [...st.chosen]; gwLawsSave(); dlg.close();
-      openGw(""); GW.q = st.q.trim();
-      requestAnimationFrame(() => { gwLawsPaint(); const t = $("#gwQ"); if (t) t.value = GW.q; gwAsk(); });
-    };
-  };
-  paint(); if (!dlg.open) dlg.showModal();
-  const ta = dlg.querySelector("#gwDlgQ"); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
-  if (!q) return;
-  try { on = window.JG.isLoggedIn(); } catch (e) { /* not ready */ }
-  st.server = "loading"; paint();
-  const more = (list, why) => list.forEach((x) => { const L = typeof x === "string" ? x : x.law; if (L && !st.sugs.some((y) => y.law === L)) st.sugs.push({law: L, why: typeof x === "string" ? why : `${why} · ${x.top || ""}`}); });
-  Promise.all([   // 맥미니 법령 검색(로그인했을 때만 — 로그인 창은 띄우지 않음) + 홈페이지 낱말 색인
-    server ? Promise.resolve(server) : on && window.JG.ai && window.JG.ai.lawSuggest ? window.JG.ai.lawSuggest(q).then((r) => (r && r.laws) || [], () => []) : Promise.resolve([]),
-    gwLawWordSugs(q).catch(() => []),
-  ]).then(([server, words]) => { more(server, "맥미니 추천"); if (server.length < 3) more(words, "질문 낱말이 든 법령"); /* 맥미니 추천이 충분하면 낱말 추천(덜 정확)은 뺀다 */ st.sugs = st.sugs.slice(0, 14); })
-    .finally(() => { st.server = true; if (dlg.open) { const keep = dlg.querySelector("#gwDlgQ"); if (keep) st.q = keep.value; paint(); } });
-}
-const gwPresetLaws = () => [...new Set([...S.selected.map((m) => S.byMst.get(m)), ...[...S.picked.values()]].filter(Boolean).map((L) => gwLawBase(L.title)).concat(GW.laws))];
-function gwLawsPaint() {
-  const c = $("#gwLawChips"); if (!c) return;
-  c.innerHTML = GW.laws.length ? GW.laws.map((n, i) => `<span class="gw-law"><span>${esc(n)}</span><button type="button" data-gwlawx="${i}" aria-label="${esc(n)} 빼기" title="빼기">×</button></span>`).join("")
-    : `<span class="meta">법령을 먼저 골라 주세요</span>`;
-  c.querySelectorAll("[data-gwlawx]").forEach((b) => b.onclick = () => { if (GW.busy) return; GW.laws.splice(+b.dataset.gwlawx, 1); gwLawsSave(); gwLawsPaint(); });
-}
-function gwNeedLawsHtml(t, k) {
-  const L = t.lawSug;
-  const chips = L && L.length ? `<div class="gw-suggest">${L.map((x, i) => `<button type="button" class="filter-chip" data-gwsl="${i}" aria-pressed="${t.lawPick.has(i)}" title="${esc(x.top || "")}">${esc(x.law)}</button>`).join("")}</div>` : "";
-  return `<div class="gw-need-laws" data-gwneed="${k}"><p>어느 법령에서 찾을까요? 법령을 골라야 정확하게 답할 수 있어요.</p>
-    ${L === null ? `<p class="meta">질문에 맞는 법령을 찾는 중…</p>` : L && L.length ? `<p class="meta">질문과 관련 있어 보이는 법령이에요. 여러 개 골라도 돼요 (시행령·시행규칙 함께 찾음).</p>${chips}` : `<p class="meta">관련 법령을 찾지 못했어요.</p>`}
-    <p class="meta">아래 ‘📚 찾을 법령’ 칸에서 직접 추가해도 돼요.</p>
-    <div class="gw-pick-btns"><button type="button" class="primary small" data-gwneedgo ${t.lawPick.size || GW.laws.length ? "" : "disabled"}>고른 법령으로 묻기</button></div></div>`;
-}
-function bindGwNeedLaws(root) {
-  root.querySelectorAll("[data-gwneed]").forEach((box) => {
-    const k = +box.dataset.gwneed, t = GW.turns[k]; if (!t || !t.needLaws) return;
-    box.querySelectorAll("[data-gwsl]").forEach((b) => b.onclick = () => { const i = +b.dataset.gwsl; if (t.lawPick.has(i)) t.lawPick.delete(i); else t.lawPick.add(i); renderGw(); });
-    box.querySelector("[data-gwneedgo]").onclick = () => {
-      [...t.lawPick].forEach((i) => gwLawAdd(t.lawSug[i].law));
-      if (!GW.laws.length) return;
-      GW.turns.splice(k, 1); GW.q = t.q; if ($("#gwQ")) $("#gwQ").value = t.q; gwAsk();
-    };
-  });
-}
-async function gwNeedLaws(q) {   // 법령 없이 물으면: 질문을 남겨 두고 법령 후보를 보여 준다 (답은 법령을 고른 뒤)
-  const t = {q, needLaws: true, lawSug: null, lawPick: new Set(), answer: "", sources: [], error: ""};
-  GW.turns.push(t); renderGw(); gwFollow();
-  try { const r = window.JG.ai.lawSuggest ? await window.JG.ai.lawSuggest(q) : {laws: []}; t.lawSug = (r && r.laws) || []; }
-  catch (e) { t.lawSug = []; t.error = gwError(e); }
-  renderGw(); gwFollow();
-}
-// 검색이 애매하면 답하기 전에 후보 조문을 보여 주고 고르게 한다 (맥미니 /ai/law/candidates — AI 안 씀, 사용 횟수 안 셈).
-// '아님'을 누르면 그 조문을 빼고 다음 후보를 띄우고(맥미니 검색도 다음부터 덜 띄우도록 배움), 고른 조문만 근거로 답한다.
-function gwPickHtml(t, k) {
-  const P = t.pick, n = P.checked.size;
-  const items = P.list.map((c) => `<li class="${P.checked.has(c.id) ? "on" : ""}"><div class="row"><label><input type="checkbox" data-gwpk="${c.id}" ${P.checked.has(c.id) ? "checked" : ""}><b>${esc(c.title)}</b></label>
-      <button type="button" class="ghost small" data-gwno="${c.id}" title="이 조문은 아니에요 — 빼고 다음 후보 보기">아님</button></div>${c.snippet ? `<p class="meta snip">${esc(c.snippet)}…</p>` : ""}</li>`).join("");
-  return `<div class="gw-pick" data-gwpickturn="${k}"><p class="meta">질문에 맞는 조문이 확실하지 않아 먼저 여쭤봐요. 맞는 조문을 골라 주세요. 아닌 조문은 ‘아님’을 누르면 빼고 다음 후보를 보여 드려요.</p>
-    ${P.list.length ? `<ul>${items}</ul>` : `<p class="meta">더 보여 드릴 후보가 없어요. 질문을 바꿔 다시 물어보세요.</p>`}
-    ${P.msg ? `<p class="meta" aria-live="polite">${esc(P.msg)}</p>` : ""}
-    <div class="gw-pick-btns"><button type="button" class="primary small" data-gwgo ${n ? "" : "disabled"}>고른 조문으로 답하기${n ? ` (${n})` : ""}</button>
-      <button type="button" class="ghost small" data-gwmore ${P.list.length > n ? "" : "disabled"} title="체크하지 않은 조문을 모두 빼고 다시 찾기">모두 아님 · 다시 찾기</button>
-      <button type="button" class="ghost small" data-gwauto title="고르지 않고 맥미니 검색이 고른 조문으로 답하기">AI가 고르게 하기</button>
-      <button type="button" class="ghost small" data-gwcancel>그만두기</button></div></div>`;
-}
-async function gwPickFetch(t) {   // 뺀 조문(누적)을 빼고 다시 찾는다. 체크한 조문은 목록 위에 남긴다
-  const P = t.pick; P.loading = true;
-  try {
-    const r = await window.JG.ai.lawCandidates(P.q, {exclude: P.ex, laws: P.laws});
-    const fresh = (r.candidates || []).filter((c) => !P.checked.has(c.id));
-    fresh.forEach((c) => { P.byId[c.id] = c; });
-    P.list = [...[...P.checked].map((id) => P.byId[id]).filter(Boolean), ...fresh].slice(0, 15); P.msg = "";
-    return r;
-  } finally { P.loading = false; }
-}
-function bindGwPick(root) {
-  root.querySelectorAll("[data-gwpickturn]").forEach((box) => {
-    const t = GW.turns[+box.dataset.gwpickturn], P = t && t.pick;
-    if (!P || P.done) return;
-    box.querySelectorAll("[data-gwpk]").forEach((x) => x.onchange = () => { const id = +x.dataset.gwpk; if (x.checked) P.checked.add(id); else P.checked.delete(id); renderGw(); });
-    const again = async (ids) => {
-      if (P.loading || !ids.length) return;
-      ids.forEach((i) => { if (!P.ex.includes(i)) P.ex.push(i); P.checked.delete(i); });
-      P.msg = "다음 후보를 찾는 중…"; renderGw();
-      try { await gwPickFetch(t); } catch (e) { P.msg = gwError(e); }
-      renderGw();
-    };
-    box.querySelectorAll("[data-gwno]").forEach((b) => b.onclick = () => again([+b.dataset.gwno]));
-    box.querySelector("[data-gwmore]").onclick = () => again(P.list.map((c) => c.id).filter((i) => !P.checked.has(i)));
-    box.querySelector("[data-gwgo]").onclick = () => { if (!P.loading && P.checked.size) P.resolve([...P.checked]); };
-    box.querySelector("[data-gwauto]").onclick = () => { if (!P.loading) P.resolve("auto"); };
-    box.querySelector("[data-gwcancel]").onclick = () => { if (!P.loading) P.resolve("cancel"); };
-  });
-}
-// 확실하면 바로 답(null), 애매하면 회원이 고를 때까지 기다린다. 반환: 고른 id 배열 | "auto" | "cancel" | null
-async function gwPick(turn, rq, laws = []) {
-  if (!window.JG.ai.lawCandidates) return null;   // 예전 SDK: 지금처럼 바로 답
-  turn.pick = {q: rq, laws, ex: [], checked: new Set(), byId: {}, list: [], msg: ""};
-  let r;
-  try { r = await gwPickFetch(turn); }
-  catch (e) { const code = e && e.code; turn.pick = null; if (code && /LOGIN|CANCELLED|AUTH|PERMISSION|CLOSED/i.test(code)) throw e; return null; }
-  if (!r.ready || r.sure || !turn.pick.list.length) { turn.pick = null; return null; }
-  const out = await new Promise((res) => { turn.pick.resolve = res; renderGw(); gwFollow(); });
-  turn.pick.done = true; renderGw();
-  return out;
-}
-async function gwAskServer(turn, k, prior, q, rq, paint, picked = null, laws = []) {
+const gwSearchLaws = () => [...new Set([...S.selected.map((m) => S.byMst.get(m)), ...[...S.picked.values()]].filter(Boolean).map((L) => L.title))];
+async function gwAskServer(turn, k, prior, q, rq, paint, picked = null, laws = [], graph = false) {
   const hist = prior.slice(-GW_KEEP);
   const text = hist.length ? `[이전 대화]\n${hist.map((x) => `질문: ${x.q}\n답: ${x.answer.slice(0, 900)}`).join("\n\n")}\n\n[이번 질문 — 위 대화에 이어서 답하세요]\n${q}` : q;
   const meta = {}; let refsP = null;
   turn.answer = ""; turn.sources = [];
-  const res = await window.JG.ai.askLaw(text, (delta, acc) => paint(acc), {retrieve_query: rq, ...(picked && picked.length ? {picked} : {}), ...(laws.length ? {laws} : {}), onMeta: (m) => {
+  const res = await window.JG.ai.askLaw(text, (delta, acc) => paint(acc), {retrieve_query: rq, ...(picked && picked.length ? {picked} : {}), ...(laws.length ? {laws} : {}), ...(graph ? {law_scope: "graph"} : {}), onMeta: (m) => {
     Object.assign(meta, m);
+    if (m.scope) { turn.scope = m.scope; const a = document.querySelector(`#gwTurn${k} .gw-scope-slot`); if (a) a.innerHTML = gwScopeHtml(m.scope); }
     if (m.retrieved_refs && !refsP) {
       turn.sources = m.retrieved_refs.map((r) => ({title: r.title, text: ""}));
       refsP = gwMapRefs(m.retrieved_refs).then((x) => { turn.sources = x; });
@@ -4501,10 +4306,7 @@ async function gwAsk() {
   if (!q || GW.busy) return;
   if ($("#gwQ")) { $("#gwQ").value = ""; $("#gwQ").style.height = "auto"; }
   GW.stick = true;
-  if (!GW.laws.length && S.selected.length) S.selected.forEach((m) => { const L = S.byMst.get(m); if (L) gwLawAdd(L.title); });   // 검색 화면에서 고른 법령을 그대로
-  GW.turns = GW.turns.filter((t) => !t.needLaws);
-  const useLaws = !!(window.JG.ai && window.JG.ai.askLaw && window.JG.ai.lawSuggest);   // 새 SDK(v1.6)일 때만 법령 지정 방식
-  if (useLaws && !GW.laws.length) { GW.q = ""; await gwNeedLaws(q); return; }
+  const useLaws = !!(window.JG.ai && window.JG.ai.askLaw && window.JG.ai.lawSuggest);   // 새 SDK(v1.6): 맥미니가 법령 연계도 범위에서 찾는다
   const prior = GW.turns.filter((t) => t.kind !== "live" && t.answer && !t.error).slice(-GW_KEEP);
   const turn = {q, answer: "", sources: [], error: "", laws: useLaws ? [...GW.laws] : null};
   const k = GW.turns.push(turn) - 1;
@@ -4520,18 +4322,15 @@ async function gwAsk() {
       gwFollow();
     };
     let served = false;
-    if (useLaws) {   // 고른 법령 안에서만: 애매하면 후보 조문 → 고른 조문 / 확실하면 바로. 못 찾으면 홈페이지 검색으로 돌리지 않고 알린다
-      const rq = last ? `${last.q} ${q}` : q, pk = await gwPick(turn, rq, turn.laws);
-      if (pk === "cancel") turn.error = "답하기를 그만뒀어요. 질문을 고쳐 다시 물어보세요.";
-      else if (!(await gwAskServer(turn, k, prior, q, rq, paint, Array.isArray(pk) ? pk : null, turn.laws))) turn.error = "고른 법령에서 질문과 관련된 조문을 찾지 못했어요. 법령을 더 고르거나 질문을 고쳐 보세요.";
+    if (useLaws) {   // 기준 법령(없으면 질문으로 자동)의 연계도 범위에서 찾아 바로 답한다. 못 찾으면 홈페이지 검색으로 돌리지 않고 알린다
+      const rq = last ? `${last.q} ${q}` : q;
+      if (!(await gwAskServer(turn, k, prior, q, rq, paint, null, turn.laws || [], true))) turn.error = "질문과 관련된 조문을 찾지 못했어요. 질문을 고쳐 보거나, 검색 화면에서 법령을 골라 ‘AI에게 묻기’를 눌러 보세요.";
       served = true;
     }
     const explicit = S.selected.length || (S.picked && S.picked.size);   // (예전 SDK) 사용자가 체크·선택한 법령이 있으면 그 법령에서 (아래 기존 방식)
     if (!served && !explicit && window.JG.ai && window.JG.ai.askLaw) {
       try {
-        const rq = last ? `${last.q} ${q}` : q, pk = await gwPick(turn, rq);   // 검색이 애매하면 후보 조문을 먼저 고르게
-        if (pk === "cancel") { served = true; turn.error = "답하기를 그만뒀어요. 질문을 고쳐 다시 물어보세요."; }
-        else served = await gwAskServer(turn, k, prior, q, rq, paint, Array.isArray(pk) ? pk : null);
+        served = await gwAskServer(turn, k, prior, q, last ? `${last.q} ${q}` : q, paint);
       }
       catch (e) {
         const code = e && e.code;
