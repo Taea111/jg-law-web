@@ -1546,9 +1546,13 @@ const S = {
 const MAX_PICK = 6;
 
 /* ---------------------------------------------------------------- ranking (as in JG법령검색) */
+// 우리 지역: 자치법규는 이 지역(군) → 같은 도 → 그 밖의 지역 순으로 보여 주고, AI 비교에도 이 순서로 쓴다
+const HOME = {sido: "충청남도", sigungu: "태안군"};
+const homeRank = (r) => (r[3] === HOME.sido && r[4] === HOME.sigungu ? 0 : r[3] === HOME.sido && !r[4] ? 1 : r[3] === HOME.sido ? 2 : 3);
 function rankLaws(q, list) {
   const qc = compact(q);
-  const score = (L) => (qc && compact(L.title).includes(qc) ? 100 : 0) + L.local + [10, 6, 3, 0][Math.min(L.level, 3)] + Math.min(20, (L.hits || 0));
+  // 순서: 법령 이름에 검색어 → 지자체 관련 법령(local) → 검색어가 든 조문이 많은 법령 → 법률·시행령·시행규칙
+  const score = (L) => (qc && compact(L.title).includes(qc) ? 1e6 : 0) + (L.local > 0 ? 1e5 : 0) + Math.min(5e4, (L.hits || 0) * 10) + L.local + [10, 6, 3, 0][Math.min(L.level, 3)];
   const fam = new Map();
   for (const L of list) { const f = fam.get(L.family) || []; f.push(L); fam.set(L.family, f); }
   const best = new Map([...fam].map(([k, v]) => [k, Math.max(...v.map(score))]));
@@ -1866,7 +1870,7 @@ async function runSearch() {
     if (S.kind === "all" && S.index.ordinances && S.index.ordinances.listed) {
       const rows = await metaOf("ordin");
       if (stale()) return;
-      ords = rows.filter((r) => named(`${r[1]} ${r[2] || ""} ${r[3] || ""} ${r[4] || ""}`)).map(ordinItem);
+      ords = rows.filter((r) => named(`${r[1]} ${r[2] || ""} ${r[3] || ""} ${r[4] || ""}`)).sort((a, b) => homeRank(a) - homeRank(b)).map(ordinItem);   // 태안군 → 충청남도 → 그 밖
       const places = new Set();
       for (const r of rows) { if (r[3]) places.add(compact(r[3])); if (r[4]) places.add(compact(r[4])); }
       placeFirst = words.some((w) => places.has(w) || ["시", "군", "구", "도"].some((x) => places.has(w + x)));  // 태안군 주민자치회
@@ -4138,8 +4142,18 @@ async function gwSources(q, prefer = []) {
       if (cand) for (const m of cand) score.set(m, (score.get(m) || 0) + 1);
       for (const L of S.laws) if (compact(L.title).includes(w)) score.set(L.mst, (score.get(L.mst) || 0) + 3);
     }
-    [...score].map(([m, v]) => [S.byMst.get(m), v]).filter(([L]) => L)
-      .sort((a, b) => b[1] - a[1] || a[0].level - b[0].level || b[0].local - a[0].local).slice(0, 4).forEach(([L]) => laws.length < 5 && add(L.mst));
+    // 후보 중 지자체 법령(전부)과 나머지 몇 개만 실제 조문을 읽어, 낱말이 조문 제목(3점)·본문(1점)에 나오는 만큼 관련도를 센다
+    const cand = [...score].map(([m, v]) => [S.byMst.get(m), v]).filter(([L]) => L)
+      .sort((a, b) => b[1] - a[1] || (b[0].local > 0) - (a[0].local > 0) || a[0].level - b[0].level);
+    const pick = [...cand.filter(([L]) => L.local > 0).slice(0, 30), ...cand.filter(([L]) => !(L.local > 0)).slice(0, 12)];
+    const rel = new Map();
+    for (const [L] of pick) {
+      let r = 0;
+      try { for (const [h, t] of (await lawData(L.mst)).a) { const ch = compact(h), ct = compact(t); for (const w of words) r += ch.includes(w) ? 3 : ct.includes(w) ? 1 : 0; } } catch (e) { /* 파일을 못 읽으면 0 */ }
+      rel.set(L.mst, r);
+    }
+    pick.sort((a, b) => b[1] - a[1] || (b[0].local > 0) - (a[0].local > 0) || rel.get(b[0].mst) - rel.get(a[0].mst) || a[0].level - b[0].level)
+      .slice(0, 4).forEach(([L]) => laws.length < 5 && add(L.mst));
   }
   const out = [];
   for (const mst of laws.slice(0, 5)) {
@@ -4153,6 +4167,30 @@ async function gwSources(q, prefer = []) {
     if (!best.length && mst === laws[0]) best.push(...scored.slice(0, 2));
     for (const x of best) out.push({mst, i: x.i, h: x.h, title: `${L.title} ${x.h}`, text: x.t.slice(0, 1500)});
     if (out.length >= 14) break;
+  }
+  // 자치법규(조례): 비교·조례 질문이거나 검색 결과에 조례가 있으면 태안군 → 충청남도 → 다른 시군 순으로(같은 자치단체는 한 건) 관련 조문을 함께 보낸다
+  const compareQ = /비교|차이|다른\s*(시|군|구|시군|지자체|자치단체|지역)|타\s*(시|군|시군)|참고할|벤치마킹/.test(q);
+  if ((compareQ || /조례|자치법규|시군|지자체/.test(q) || S.results.some((r) => r.kind === "ordin")) && S.index.ordinances && S.index.ordinances.listed) {
+    const rows = await metaOf("ordin"), STOP = /^(조례|자치법규|규칙|비교|비교해|차이|다른|시군|지자체|참고|참고할|만들|만들때|태안군|충청남도|설치|운영|관한|대한)$/;
+    const ow = words.filter((w) => !STOP.test(w));
+    let cand = S.results.filter((r) => r.kind === "ordin").map((r) => r.row);
+    if (cand.length < (compareQ ? 5 : 2) && ow.length) cand = cand.concat(rows.filter((r) => r[7] && ow.every((w) => compact(r[1]).includes(w))));
+    const seen = new Set(), pickO = [];
+    for (const r of cand.filter((r) => r && r[7]).sort((a, b) => homeRank(a) - homeRank(b))) {
+      const k = `${r[3]} ${r[4]}`; if (seen.has(k)) continue; seen.add(k); pickO.push(r);
+      if (pickO.length >= (compareQ ? 5 : 2)) break;
+    }
+    const ordOut = [];
+    for (const r of pickO) {
+      let parts = null; try { parts = await caseParts("ordin", r[0]); } catch (e) { /* 못 읽으면 건너뜀 */ }
+      if (!Array.isArray(parts)) continue;
+      const arts = parts.map(([h, t], i) => ({i, h, t: String(t || ""), c: compact(`${h} ${t}`), hc: compact(h || "")})).filter((x) => x.t && !/^부칙/.test(x.h || ""));
+      const sc = arts.map((x) => ({...x, score: ow.reduce((a, w) => a + (x.hc.includes(w) ? 3 : x.c.includes(w) ? 1 : 0), 0)}));
+      const best = (sc.some((x) => x.score) ? sc.filter((x) => x.score).sort((a, b) => b.score - a.score || a.i - b.i) : sc).slice(0, compareQ ? 6 : 3).sort((a, b) => a.i - b.i);
+      for (const x of best) ordOut.push({kind: "ordin", id: r[0], i: x.i, h: x.h, title: `${r[1]} ${x.h}`, text: x.t.slice(0, 1200)});
+    }
+    if (compareQ) return [...ordOut, ...out].slice(0, 24);   // 비교 질문은 조례가 주인공
+    return [...out.slice(0, 10), ...ordOut].slice(0, 16);
   }
   return out.slice(0, 14);
 }
@@ -4240,7 +4278,7 @@ function gwFollow() { const m = $("#gwMsgs"); if (m && m.scrollHeight - m.scroll
 function bindGwRefs(root) {
   root.querySelectorAll("[data-gwref]").forEach((b) => b.onclick = () => {
     const t = GW.turns[+b.dataset.gwturn], x = t && t.sources[+b.dataset.gwref];
-    if (x) openLawWindow(x.mst, x.i);
+    if (x) { if (x.kind === "ordin") openCase("ordin", x.id); else openLawWindow(x.mst, x.i); }
   });
 }
 // 맥미니 법령 검색으로 묻기: 근거 조문은 Gateway 가 고르고(meta.retrieved_refs), 이 화면의 법령·조문으로 이어 [n]을 누르면 그 조문이 뜬다.
@@ -4387,7 +4425,8 @@ async function gwAsk() {
       turn.answer = "";
       try {
         const res = turn.sources.length
-          ? await window.JG.askWithSources(text, turn.sources.map((x) => ({title: x.title, text: x.text.slice(0, t.chars)})), (delta, acc) => paint(acc))
+          ? await window.JG.askWithSources(text, turn.sources.map((x) => ({title: x.title, text: x.text.slice(0, t.chars)})), (delta, acc) => paint(acc),
+              {onThinking: () => { const el = document.querySelector(`#gwTurn${k} .gw-answer`); if (el && !turn.answer) el.innerHTML = '<p class="meta">🔎 조문을 비교·검토하고 있어요… (보통 30초~1분)</p>'; }})
           : await window.JG.askStream(text, (delta, acc) => paint(acc));
         const final = typeof res === "string" ? res : res && (res.text || res.answer || res.content);
         if (final) turn.answer = String(final);
