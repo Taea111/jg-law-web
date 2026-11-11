@@ -2188,6 +2188,87 @@ function renderReader() {
 function bindTabs() { $("#reader").querySelectorAll("[data-rt]").forEach((b) => b.onclick = () => { S.rightTab = b.dataset.rt; renderReader(); }); }
 function cleanArticle(h, t) { const head = (h || "").trim(); return t && head && t.startsWith(head) ? t.slice(head.length).trim() || t : t; }
 function sourceTable(rows) { return `<dl class="source-table">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>`; }
+
+/* ---------------------------------------------------------------- 내려받기: 법령·자치법규·사례 전체, 또는 드래그해 고른 부분 (.txt) */
+// UTF-8 BOM + CRLF so Windows 메모장·한글(HWP)·워드에서 한글이 깨지지 않는다.
+function saveText(name, text) {
+  const safe = String(name || "").replace(/[\\/:*?"<>|\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 90) || "법령";
+  const url = URL.createObjectURL(new Blob(["\ufeff" + String(text).replace(/\r?\n/g, "\r\n")], {type: "text/plain;charset=utf-8"}));
+  const a = Object.assign(document.createElement("a"), {href: url, download: safe + ".txt"});
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+function dlDay() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+function dlHead(title, info, url, note = "") {
+  return [title + (note ? ` (${note})` : ""), info,
+    `출처: 국가법령정보센터 · JG법령검색(${location.host}) · 자료 기준 ${(S.index.source || S.index.built || "").slice(0, 10) || "-"} · 내려받은 날 ${dlDay()}`,
+    url ? `원문: ${url}` : "", "=".repeat(40), ""].filter((x) => x !== "").join("\n") + "\n\n";
+}
+const dlPart = (h, t) => { h = String(h || "").trim(); t = String(t || "").trim(); return !t || t === h ? h : h ? `${h}\n${t}` : t; };
+async function lawText(mst) {
+  const L = S.byMst.get(mst), d = await lawData(mst);
+  return dlHead(L.title, [L.kind, L.ministry, "시행 " + (L.effective || "-")].filter(Boolean).join(" · "), ORIGINAL.law(mst))
+    + d.a.map(([h, t]) => dlPart(h, cleanArticle(h, t))).join("\n\n") + "\n";
+}
+function caseText(kind, id, r, parts) {
+  const info = kind === "ordin" ? [r[2], r[5], r[6] && "시행 " + r[6]] : [LABEL[kind], r && r[2], r && r[3]];
+  return dlHead(r ? r[1] : LABEL[kind], info.filter(Boolean).join(" · "), ORIGINAL[kind](id))
+    + (parts || []).map(([h, t]) => dlPart(h, kind === "ordin" ? cleanArticle(h, t) : t)).join("\n\n") + "\n";
+}
+async function ordText(id) {
+  await metaOf("ordin");
+  const r = S.metaById.ordin.get(id);
+  return caseText("ordin", id, r, await caseParts("ordin", id));
+}
+// The text dragged over inside `root` (the whole page when none), or "".
+function selectedText(root) {
+  const sel = getSelection();
+  if (!sel || !sel.rangeCount || sel.isCollapsed) return "";
+  if (root && !root.contains(sel.getRangeAt(0).commonAncestorContainer)) return "";
+  return String(sel).replace(/\n{3,}/g, "\n\n").trim();
+}
+// Where the selection is: the window (dialog) or the reading pane, and what that document is called.
+function selectionTitle() {
+  const sel = getSelection(), node = sel && sel.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null;
+  const el = node && (node.nodeType === 1 ? node : node.parentElement);
+  if (el && el.closest("#dlg")) return $("#dlgTitle").textContent || "선택한 부분";
+  if (el && el.closest("#reader") && S.chosen) {
+    const L = S.chosen.type === "law" ? S.byMst.get(S.chosen.id) : null;
+    return L ? L.title : S.chosen.row ? S.chosen.row[1] : "선택한 부분";
+  }
+  if (el && el.closest("#pageCompare")) return "법령 비교";
+  return "선택한 부분";
+}
+function saveSelection(root, title) {
+  const t = selectedText(root);
+  if (!t) return false;
+  const name = title || selectionTitle();
+  saveText(`${name} (선택한 부분)`, dlHead(name, "", "", "선택한 부분") + t + "\n");
+  return true;
+}
+// [⬇ 전체 내려받기] [✂ 고른 부분 내려받기] — `whole` makes the full text (may be async).
+function dlButtons(prefix) {
+  return `<button type="button" class="ghost small add-filter" id="${prefix}All" title="이 문서 전체를 텍스트 파일(.txt)로 받습니다">⬇ 내려받기</button>
+    <button type="button" class="ghost small add-filter" id="${prefix}Sel" title="본문에서 마우스로 드래그해 고른 부분만 텍스트 파일(.txt)로 받습니다">✂ 고른 부분 내려받기</button>`;
+}
+function bindDlButtons(prefix, root, title, whole) {
+  const all = document.getElementById(prefix + "All"), part = document.getElementById(prefix + "Sel");
+  if (all) all.onclick = async () => {
+    const was = all.textContent; all.disabled = true; all.textContent = "만드는 중…";
+    try { saveText(title, await whole()); all.textContent = "내려받았습니다"; }
+    catch (e) { all.textContent = "받지 못했습니다"; }
+    setTimeout(() => { all.disabled = false; all.textContent = was; }, 1800);
+  };
+  if (part) {
+    part.onmousedown = (e) => e.preventDefault();   // keep the dragged selection when the button is pressed
+    part.onclick = () => {
+      const r = typeof root === "function" ? root() : root, was = part.textContent;
+      if (saveSelection(r, title)) part.textContent = "내려받았습니다";
+      else part.textContent = "본문을 먼저 드래그해 고르세요";
+      setTimeout(() => { part.textContent = was; }, 2200);
+    };
+  }
+}
 function lawHtml(L) {
   const d = S.chosen.data;
   const head = `<div class="reader-head">${typeBadge(lawType(L), L.kind)}${L.kind && L.kind !== lawType(L) ? ` <span class="type-label">${esc(L.kind)}</span>` : ""}${L.local >= 40 ? ' <span class="type-label local-badge">지자체</span>' : ""}
@@ -2196,7 +2277,8 @@ function lawHtml(L) {
     <button type="button" class="ghost small add-filter" id="toCompare">📑 다른 법령과 비교</button>
     ${S.split ? "" : `<button type="button" class="secondary small add-filter" id="selLaw" title="옆에 법령 비교를 띄우고 연계도의 가운데로 (결과를 두 번 눌러도 됨)">📌 선택 · 옆에 비교</button>`}
     <button type="button" class="ghost small add-filter" id="toGraph">🕸 연계도</button>
-    ${favBtn("law", L.mst, null, true)}</div>
+    ${favBtn("law", L.mst, null, true)}
+    ${dlButtons("dlLaw")}</div>
     <nav class="reader-tabs" role="tablist" aria-label="문서 보기"><button role="tab" data-dt="content" aria-selected="${S.detailTab !== "source"}">내용</button>
     <button role="tab" data-dt="source" aria-selected="${S.detailTab === "source"}">출처와 날짜</button></nav>`;
   if (S.detailTab === "source") return `<div class="law-main">${head}<div class="reader-content">${sourceTable([
@@ -2225,6 +2307,7 @@ function bindLaw(L) {
   if ($("#toCompare")) $("#toCompare").onclick = () => startCompare(L.mst);
   if ($("#selLaw")) $("#selLaw").onclick = () => selectLaw(L.mst);
   if ($("#toGraph")) $("#toGraph").onclick = () => { $("#gCenter").value = L.title; showPage("graph"); if (G.center !== L.mst) buildGraph(L.mst); };
+  bindDlButtons("dlLaw", () => $("#reader .reader-content") || $("#reader"), L.title, () => lawText(L.mst));
   bindFavBtns($("#reader"));
   const find = $("#lawFind");
   if (!find) return;
@@ -2387,7 +2470,8 @@ function caseDocHtml() {
   if (parts === undefined) return `<p class="empty">불러오는 중…</p>`;
   const info = kind === "ordin" ? [r[2], r[5], r[6] && "시행 " + r[6]] : [r && r[2], r && r[3]];
   const head = `<div class="reader-head"><span class="type-label">${LABEL[kind]}</span><h2>${esc(r ? r[1] : "")}</h2>
-    <div class="meta">${esc(info.filter(Boolean).join(" · "))}</div>${r ? favBtn(kind, id, null, true) : ""}${r && kind === "ordin" && r[7] ? ' <button type="button" class="ghost small" id="ordCmp">📑 다른 지자체 조례와 비교</button>' : ""}</div>
+    <div class="meta">${esc(info.filter(Boolean).join(" · "))}</div>${r ? favBtn(kind, id, null, true) : ""}${r && kind === "ordin" && r[7] ? ' <button type="button" class="ghost small" id="ordCmp">📑 다른 지자체 조례와 비교</button>' : ""}
+    ${r && parts ? dlButtons("dlDoc") : ""}</div>
     <nav class="reader-tabs" role="tablist" aria-label="문서 보기"><button role="tab" data-dt="content" aria-selected="${S.detailTab !== "source"}">내용</button>
     <button role="tab" data-dt="source" aria-selected="${S.detailTab === "source"}">출처와 날짜</button></nav>`;
   if (S.detailTab === "source") return head + `<div class="reader-content">${sourceTable([
@@ -2400,6 +2484,8 @@ function refreshCaseAi() { document.querySelectorAll("[data-ai-case]").forEach((
 function bindCaseDoc() {
   $("#reader").querySelectorAll("[data-dt]").forEach((b) => b.onclick = () => { S.detailTab = b.dataset.dt; renderReader(); });
   if ($("#ordCmp")) $("#ordCmp").onclick = () => startCompare("o:" + S.chosen.id);
+  const {kind, id, row: r, parts} = S.chosen;
+  if (r && parts) bindDlButtons("dlDoc", () => $("#reader .reader-content") || $("#reader"), r[1], () => caseText(kind, id, r, parts));
 }
 
 /* ---------------------------------------------------------------- Claude (the viewer's own claude.ai login; DB search needs none) */
@@ -2849,7 +2935,8 @@ function guideHtml() {
       <li>${ext} 표시는 국가법령정보센터 이외에서 온 내용(Claude의 자체 지식, 다른 지자체 사례, DB에 없는 판례 내용 등)과 근거 번호가 없는 설명입니다. 공식 자료가 아니므로 반드시 원문으로 확인하세요.</li>
       <li>Claude 답은 법률 자문이 아닙니다. 실제 업무에는 원문과 적용 시행일을 확인하세요.</li></ul>`)}
     ${sec("9. 키보드와 마우스", `<ul><li>Ctrl+K 검색창 · ↑↓ 결과 이동 · Space 체크 · Ctrl+F 이 법령에서 찾기 · Ctrl+B 노트북 · Ctrl+S 검색어 저장 · Ctrl+Enter Claude에게 묻기 · Esc 사례 목록으로 · F1 단축키 도움말</li>
-      <li>오른쪽 클릭: 복사, 고른 낱말로 검색, 이 법령에서 찾기, 법령 필터에 추가, 이름 복사.</li>
+      <li>오른쪽 클릭: 복사, 고른 낱말로 검색, 이 법령에서 찾기, 법령 필터에 추가, 이름 복사, 고른 부분·이 조문 내려받기.</li>
+      <li><b>⬇ 내려받기</b>: 법령·자치법규·판례 화면 위쪽 버튼으로 전체 본문을 텍스트 파일(.txt)로 받습니다. 본문 일부를 마우스로 드래그해 고른 뒤 <b>✂ 고른 부분 내려받기</b>를 누르면 그 부분만 받습니다. 메모장·한글·워드에서 바로 열립니다.</li>
       <li>[설정]에서 화면(밝게 / 어둡게)과 본문 글자 크기를 바꿉니다. 법령 필터·저장한 검색어·설정은 이 브라우저에만 저장됩니다.</li></ul>`)}
     ${sec("10. 자료 업데이트", `<p>관리자(소유자·편집자)는 위쪽 <b>[DB 업데이트]</b>로 새 자료를 올립니다. JG법령수집의 <span class="mono">archive.db</span>를 바로 고르면 이 브라우저 안에서 자료 묶음으로 바꿔 바뀐 파일만 올리고(파일은 다른 곳으로 보내지 않음), [아티팩트용 내보내기] 폴더를 골라도 됩니다. 올리면 링크로 보는 모든 사람에게 새 자료가 보이고, 열어 둔 화면에는 ‘새 자료로 보기’ 안내가 뜹니다. 로그인하지 않은 사람은 처음 게시한 자료를 봅니다.</p>`)}
     ${sec("11. 법령 연계도", `<p>위쪽 <b>🕸 법령 연계도</b>에서 법령 하나를 가운데에 두고, 그 법령과 이어진 법령을 그림으로 봅니다. 열어 둔 법령이 있으면 그 법령으로 시작합니다.</p>
@@ -3268,6 +3355,8 @@ document.addEventListener("contextmenu", (e) => {
   const sel = String(getSelection() || "").trim();
   if (sel) {
     items.push(["복사", "Ctrl+C", () => navigator.clipboard && navigator.clipboard.writeText(sel)]);
+    const selTitle = selectionTitle(), selText = selectedText();
+    items.push(["고른 부분 내려받기 (.txt)", "", () => saveText(`${selTitle} (선택한 부분)`, dlHead(selTitle, "", "", "선택한 부분") + selText + "\n")]);
     if (sel.length <= 60) {
       items.push([`‘${sel.length > 18 ? sel.slice(0, 18) + "…" : sel}’ 검색`, "", () => { $("#q").value = sel.replace(/\s+/g, " "); search($("#q").value); }]);
       if ($("#lawFind")) items.push(["이 법령에서 찾기", "Ctrl+F", () => { S.lawFind = sel; S.findIndex = 0; S.onlyMatches = true; renderReader(); }]);
@@ -3286,6 +3375,8 @@ document.addEventListener("contextmenu", (e) => {
   }
   const art = e.target.closest(".reading-article");
   if (art && !sel) items.push(["이 조문 복사", "", () => navigator.clipboard && navigator.clipboard.writeText(art.innerText.trim())]);
+  if (art && !sel) { const t = art.closest("#dlg") ? $("#dlgTitle").textContent : selectionTitle(), a = art.innerText.trim();
+    items.push(["이 조문 내려받기 (.txt)", "", () => saveText(`${t} ${a.split("\n")[0].slice(0, 30)}`, dlHead(t, "", "", a.split("\n")[0].slice(0, 40)) + a + "\n")]); }
   if (!items.length) { items.push(["검색창으로", "Ctrl+K", () => $("#q").focus()]); items.push(["단축키와 마우스", "F1", openKeys]); }
   e.preventDefault();
   ctx.innerHTML = items.map(([label, key], i) => `<button type="button" role="menuitem" data-i="${i}"><span>${esc(label)}</span>${key ? `<kbd>${key}</kbd>` : ""}</button>`).join("");
@@ -3854,7 +3945,7 @@ async function openLawWindow(mst, target = null, back = false) {
     <div class="lw-actions">${LW.stack.length ? `<button type="button" class="ghost small" id="lwBack">← ${esc((S.byMst.get(LW.stack[LW.stack.length - 1]) || {title: "이전 법령"}).title)}</button>` : ""}
       <button type="button" class="primary small" id="lwOpen">본문 화면에서 열기</button>
       ${G.center && mst !== G.center ? `<button type="button" class="secondary small" id="lwCenter">이 법령을 연계도 가운데로</button>` : ""}
-      <button type="button" class="ghost small" id="lwCmp">📑 비교에 넣기</button>${favBtn("law", mst, null, true)}
+      <button type="button" class="ghost small" id="lwCmp">📑 비교에 넣기</button>${favBtn("law", mst, null, true)}${dlButtons("lwDl")}
       <a class="ghost small" style="display:inline-flex;align-items:center;text-decoration:none" href="${ORIGINAL.law(mst)}" target="_blank" rel="noopener noreferrer">원문 ↗</a></div>
     <div class="law-find lw-find"><label class="vh" for="lwFind">이 법령에서 찾기</label><input id="lwFind" type="search" placeholder="이 법령에서 찾기"><span class="find-count" id="lwCount"></span></div>
     <div class="lw-arts" id="lwArts"></div>`;
@@ -3863,6 +3954,7 @@ async function openLawWindow(mst, target = null, back = false) {
   if ($("#lwCenter")) $("#lwCenter").onclick = () => { $("#dlg").close(); $("#gCenter").value = L.title; buildGraph(mst); };
   $("#lwCmp").onclick = (e) => { addCompare(mst); e.target.textContent = "비교에 넣었습니다"; };
   if ($("#lwBack")) $("#lwBack").onclick = () => openLawWindow(LW.stack.pop(), null, true);
+  bindDlButtons("lwDl", $("#lwArts"), L.title, () => lawText(mst));
   // The find box stays right under the law's name (the window's head) while the articles scroll.
   $("#dlg").style.setProperty("--lw-top", $("#dlg .box-head").offsetHeight + "px");
   bindFavBtns(body);
@@ -4773,9 +4865,10 @@ async function cmpOpenOrd(id, i) {
   const parts = (await caseParts("ordin", id)) || [], a = parts[i] || ["", "이 조문을 찾지 못했습니다."];
   const body = openDialog(`${r[1]} ${a[0]}`, `<div>${typeBadge(r[5] || "자치법규")} <span class="meta">${esc(r[2])} · 시행 ${esc(r[6] || "-")}</span></div>
     <article class="reading-article"><h3>${esc(a[0])}</h3><p style="white-space:pre-wrap">${esc(cleanArticle(a[0], a[1]))}</p></article>
-    <div class="lw-actions"><button type="button" class="secondary small" id="owAll">이 자치법규 전체 보기</button>
+    <div class="lw-actions"><button type="button" class="secondary small" id="owAll">이 자치법규 전체 보기</button>${dlButtons("owDl")}
       <a class="ghost small" href="${ORIGINAL.ordin(id)}" target="_blank" rel="noopener noreferrer">국가법령정보센터 원문 ↗</a></div>`);
   body.querySelector("#owAll").onclick = () => { $("#dlg").close(); showPage("search"); openCase("ordin", id); };
+  bindDlButtons("owDl", body, r[1], () => ordText(id));
 }
 // Two to five laws or ordinances side by side. The first is the base: in 짝지어 보기 every other one's articles
 // are paired with the base's articles. With two, both sides mark their own words.
