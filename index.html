@@ -570,6 +570,64 @@ kbd {font-family:var(--font-sans);font-size:12px;color:var(--ink-muted);border:1
   .source-table div {grid-template-columns:1fr;gap:4px;}
 }
 @media (prefers-reduced-motion:reduce) {* {scroll-behavior:auto !important;transition:none !important;}}
+
+/* ===== JG Brutal theme (JG시리즈 공통, 2026-11-18): yellow ground, white boxes, 3px black lines, hard shadows,
+   no rounded corners, light only. Overrides the tokens and boxes above. BY JG ===== */
+:root, :root[data-theme="dark"], :root:not([data-theme="light"]) {
+  --surface-100:#FFFFFF; --surface-200:#FFD84D; --ink:#111111; --ink-muted:#333333; --line:#111111;
+  --brand:#111111; --soft-brand:#A9D4FF; --on-brand:#FFFFFF; --danger:#B3001B;
+  --local:#0B6B2E; --local-line:#111111; --local-soft:#9BE7B4; --mark:#FFE98A; --mark-ink:#111111;
+  --warn:#7A4F00; --warn-soft:#FFE98A; --head:#111111; --head-ink:#111111; color-scheme:light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --surface-100:#FFFFFF; --surface-200:#FFD84D; --ink:#111111; --ink-muted:#333333; --line:#111111;
+  --brand:#111111; --soft-brand:#A9D4FF; --on-brand:#FFFFFF; --danger:#B3001B;
+  --local:#0B6B2E; --local-line:#111111; --local-soft:#9BE7B4; --mark:#FFE98A; --mark-ink:#111111;
+  --warn:#7A4F00; --warn-soft:#FFE98A; --head:#111111; --head-ink:#111111; color-scheme:light; } }
+html, body { background:#FFD84D; }
+body *:not(svg):not(svg *) { border-radius:0 !important; }
+a { color:#111111; font-weight:700; }
+:focus-visible { outline:3px solid #A9D4FF; outline-offset:2px; }
+.topbar { background:#111111; color:#FFFFFF; box-shadow:none; border-bottom:3px solid #111111; }
+.mark-logo { background:#FFD84D; color:#111111; border:3px solid #FFD84D; }
+.topbar .ghost, .topbar .secondary { background:#FFFFFF; color:#111111; border:3px solid #FFFFFF; box-shadow:none; }
+.topbar .ghost:hover, .topbar .secondary:hover { background:#A9D4FF; border-color:#A9D4FF; }
+.head-counts .total { background:#FFD84D; color:#111111; }
+.page-nav { background:#FFFFFF; border-bottom:3px solid #111111; }
+.page-nav button { color:#333333; border-bottom:4px solid transparent; }
+.page-nav button[aria-selected="true"] { background:#111111; color:#FFFFFF; border-bottom-color:#111111; }
+.page-nav button:hover { background:#A9D4FF; color:#111111; }
+.primary { background:#111111; color:#FFFFFF; border:3px solid #111111; box-shadow:4px 4px 0 #111111; }
+.primary:hover { background:#333333; }
+.secondary, .ghost { background:#FFFFFF; color:#111111; border:3px solid #111111; box-shadow:4px 4px 0 #111111; font-weight:700; }
+.secondary:hover, .ghost:hover { background:#A9D4FF; border-color:#111111; }
+.primary:active, .secondary:active, .ghost:active { transform:translate(2px,2px); box-shadow:2px 2px 0 #111111; }
+button:disabled { opacity:1; color:#8A8A8A; border-color:#8A8A8A; box-shadow:none; }
+.panel, .case-panel, .g-detail, .ai-box, .conf-card, .cmp-slot, .lib-sum { background:#FFFFFF; border:3px solid #111111; box-shadow:7px 7px 0 #111111; }
+.search-area { border:3px solid #111111; box-shadow:7px 7px 0 #111111; }
+.search-area:focus-within { border-color:#111111; background:#FFFFFF; outline:3px solid #A9D4FF; }
+input[type="text"], input[type="search"], input:not([type]), select, textarea { border-color:#111111; }
+.graph-bar input, .cmp-slot-form input, .conf-row input, .lib-head select, .region-row select, .gw-input, .ask-dock textarea, .nb-ask textarea { border:3px solid #111111; background:#FFFFFF; }
+.result { border:2px solid transparent; }
+.result:hover { background:#A9D4FF; }
+.result.active, .result-row.ticked .result { border:3px solid #111111; background:#A9D4FF; }
+.type-chips button, .filter-chip, .kinds button, .sev-filter button, .graph-zoom button, .scroll-btns button { border:2px solid #111111; background:#FFFFFF; color:#111111; }
+.type-chips button[aria-pressed="true"], .filter-chip[aria-pressed="true"], .kinds button[aria-pressed="true"], .kinds button[aria-selected="true"] { background:#111111; color:#FFFFFF; border-color:#111111; }
+.type-badge { border:2px solid #111111; }
+.table-wrap th, .table-wrap td { border:2px solid #111111; }
+.table-wrap th { background:#FFE98A; }
+mark { background:#FFE98A; color:#111111; outline:2px solid #111111; }
+.gw-msg.me .gw-bubble { background:#111111; color:#FFFFFF; border:3px solid #111111; }
+.gw-msg.ai .gw-bubble { background:#FFFFFF; color:#111111; border:3px solid #111111; box-shadow:4px 4px 0 #111111; }
+.ask-dock { background:#FFFFFF; border-top:3px solid #111111; box-shadow:none; }
+dialog { border:3px solid #111111; box-shadow:7px 7px 0 #111111; }
+dialog::backdrop { background:rgba(17,17,17,.55); }
+.page-foot { border-top:3px solid #111111; color:#111111; }
+/* dark mode is gone in the brutal theme: undo the dark badge colours */
+:root .type-badge, :root[data-theme="dark"] .type-badge, :root:not([data-theme="light"]) .type-badge { background:var(--tb); color:#111111; border-color:#111111; }
+:root .g-node circle, :root[data-theme="dark"] .g-node circle, :root:not([data-theme="light"]) .g-node circle { fill:var(--tb); stroke:#111111; }
+:root .sev-high, :root .sev-medium, :root .sev-low, :root[data-theme="dark"] .sev-high, :root[data-theme="dark"] .sev-medium, :root[data-theme="dark"] .sev-low,
+:root:not([data-theme="light"]) .sev-high, :root:not([data-theme="light"]) .sev-medium, :root:not([data-theme="light"]) .sev-low { --svb:color-mix(in srgb, var(--sv) 18%, #FFFFFF); }
 </style>
 
 <header class="topbar"><div class="topbar-inner">
