@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko" data-mode="public">
 <meta charset="utf-8">
-<title>JG법령검색</title>
+<title>JG법령</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap">
@@ -692,7 +692,7 @@ dialog::backdrop { background:rgba(17,17,17,.55); }
 </style>
 
 <header class="topbar"><div class="topbar-inner">
-  <div class="brand"><span class="mark-logo" aria-hidden="true">JG</span><span class="brand-text"><strong>JG법령검색</strong><small>국가법령정보센터 자료 · 검색 · Claude 분석</small></span></div>
+  <div class="brand"><span class="mark-logo" aria-hidden="true">JG</span><span class="brand-text"><strong>JG법령</strong><small>국가법령정보센터 자료 · 검색 · Claude 분석</small></span></div>
   <div class="head-counts" id="headCounts" aria-label="받은 법령 수"></div>
   <div class="top-actions">
     <span class="sync-state" id="syncState">자료 불러오는 중…</span>
@@ -710,7 +710,7 @@ dialog::backdrop { background:rgba(17,17,17,.55); }
   <button type="button" role="tab" data-page="compare" aria-selected="false">📑 법령 비교</button>
 </div></nav>
 <main class="main-wrap">
-  <h1 class="vh">JG법령검색</h1>
+  <h1 class="vh">JG법령</h1>
   <div id="pageSearch">
   <div id="stickSentinel" aria-hidden="true"></div>
   <div class="sticky-top" id="stickyTop">
@@ -2338,7 +2338,7 @@ function saveText(name, text) {
 function dlDay() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
 function dlHead(title, info, url, note = "") {
   return [title + (note ? ` (${note})` : ""), info,
-    `출처: 국가법령정보센터 · JG법령검색(${location.host}) · 자료 기준 ${(S.index.source || S.index.built || "").slice(0, 10) || "-"} · 내려받은 날 ${dlDay()}`,
+    `출처: 국가법령정보센터 · JG법령(${location.host}) · 자료 기준 ${(S.index.source || S.index.built || "").slice(0, 10) || "-"} · 내려받은 날 ${dlDay()}`,
     url ? `원문: ${url}` : "", "=".repeat(40), ""].filter((x) => x !== "").join("\n") + "\n\n";
 }
 const dlPart = (h, t) => { h = String(h || "").trim(); t = String(t || "").trim(); return !t || t === h ? h : h ? `${h}\n${t}` : t; };
@@ -4465,7 +4465,7 @@ function openGw(q) {
   renderList(); renderReader();
   requestAnimationFrame(gwAlign);
 }
-const GW_ERRORS = {APP_PERMISSION_DENIED: "이 계정은 JG법령검색 AI를 쓸 권한이 없습니다. 관리자에게 문의하세요.",
+const GW_ERRORS = {APP_PERMISSION_DENIED: "이 계정은 JG법령 AI를 쓸 권한이 없습니다. 관리자에게 문의하세요.",
   LOGIN_REQUIRED: "로그인이 필요합니다. 맨 위 [로그인]을 누르세요.", UNAUTHORIZED: "로그인이 필요합니다. 맨 위 [로그인]을 누르세요."};
 // The Gateway's own words, with its code and HTTP status (so the cause shows, not only "받지 못했습니다").
 function gwDetail(e) {
