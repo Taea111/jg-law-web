@@ -4238,7 +4238,7 @@ function gwLinked() { try { return sessionStorage.getItem("jg.linked") === "1"; 
 function gwLoginLabel() {
   const b = $("#gwLogin"); let on = false; try { on = window.JG.isLoggedIn(); } catch (e) { /* not yet */ }
   const linked = on && gwLinked();
-  b.textContent = linked ? "연동중" : on ? "로그아웃" : "로그인";
+  b.textContent = linked ? "연결중" : on ? "로그아웃" : "로그인";
   b.title = linked ? "JG시리즈 로그인을 그대로 쓰고 있어요. 로그아웃은 JG시리즈에서 해요." : on ? "JG 회원 로그아웃" : "JG 회원 로그인 (AI 질문)";
   b.classList.toggle("linked", linked);
   const note = $("#gwLoginNote");
