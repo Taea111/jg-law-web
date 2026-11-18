@@ -630,6 +630,30 @@ dialog::backdrop { background:rgba(17,17,17,.55); }
 .page-stick { position:sticky; top:var(--nav-h, 0px); z-index:20; margin-bottom:14px; }
 #graphStick .graph-help { border-top:2px solid #111111; text-align:left; padding:8px 16px; }
 #cmpPick { max-height:60vh; overflow-y:auto; }
+/* Wide screens: the page itself never scrolls. The header, page tabs and each page's search area stay put;
+   only the laws (result list, the opened law) and the graph area scroll inside their own boxes. */
+@media (min-width:811px) {
+  html { height:100%; overflow:hidden; scroll-padding-top:0; }
+  body { height:100%; overflow:hidden; display:flex; flex-direction:column; }
+  .topbar, .page-nav { flex:none; }
+  .main-wrap { flex:1 1 auto; min-height:0; width:100%; display:flex; flex-direction:column; overflow:hidden;
+    padding-top:14px; padding-bottom:calc(var(--dock-h) + 14px); }
+  .page-foot, #stickSentinel, .scroll-btns { display:none !important; }
+  #pageSearch { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+  #pageSearch .sticky-top { position:relative; top:0; flex:none; }
+  #pageSearch .workspace { flex:1 1 auto; min-height:0; align-items:stretch; grid-template-rows:minmax(0,1fr); margin-top:8px; }
+  .workspace > .panel { min-height:0; overflow-y:auto; }
+  .workspace:not(.list-only) > .result-panel { position:relative; top:0; display:flex; flex-direction:column; overflow:hidden; }
+  .workspace:not(.list-only) .result-items { flex:1 1 auto; min-height:0; max-height:none !important; }
+  .workspace.list-only > .result-panel { overflow-y:auto; }
+  .reader { min-height:0; }
+  .law-find { top:0 !important; }
+  .case-panel { top:0 !important; }
+  #pageGraph, #pageCompare, #pageConflict { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  .page-stick { top:0; }
+  #pageGraph .graph-wrap { height:calc(100dvh - var(--top-h, 70px) - var(--sticky-h, 260px) - var(--dock-h) - 60px); min-height:320px; }
+  #pageCompare .cmp-head { top:calc(var(--sticky-h) - var(--nav-h, 0px)); }
+}
 /* dark mode is gone in the brutal theme: undo the dark badge colours */
 :root .type-badge, :root[data-theme="dark"] .type-badge, :root:not([data-theme="light"]) .type-badge { background:var(--tb); color:#111111; border-color:#111111; }
 :root .g-node circle, :root[data-theme="dark"] .g-node circle, :root:not([data-theme="light"]) .g-node circle { fill:var(--tb); stroke:#111111; }
@@ -2214,7 +2238,7 @@ $("#backAsk").onclick = () => {
   S.rightTab = to.tab; renderReader();
   requestAnimationFrame(() => {
     const a = to.answer && document.getElementById(to.answer);
-    if (a) a.scrollIntoView({block: "start"}); else window.scrollTo(0, to.scroll);
+    if (a) a.scrollIntoView({block: "start"}); else { window.scrollTo(0, to.scroll); $("#reader").scrollTop = to.inner || 0; }
   });
 };
 function renderReader() {
@@ -2824,7 +2848,7 @@ async function openRef(chat, ref, from) {
     // A law link from an answer: keep a way back to that answer (the button at the bottom right).
     if (S.rightTab !== "doc" && from && $("#reader").contains(from)) {
       const answer = from.closest("[id^='qa-']");
-      S.backTo = {tab: S.rightTab, answer: answer && answer.id, scroll: window.scrollY};
+      S.backTo = {tab: S.rightTab, answer: answer && answer.id, scroll: window.scrollY, inner: $("#reader").scrollTop};
     }
     S.rightTab = "doc";
     await openLaw(it.mst);
@@ -3470,6 +3494,7 @@ ctx.addEventListener("keydown", (e) => {
   const measure = () => {
     const nav = $(".page-nav") ? $(".page-nav").offsetHeight : 0;          // the page tabs stay on top too
     root.style.setProperty("--nav-h", nav + "px");
+    root.style.setProperty("--top-h", ($(".topbar") ? $(".topbar").offsetHeight : 0) + "px");
     root.style.setProperty("--sticky-h", nav + frozen().offsetHeight + "px");
     const dock = $("#askDock");
     root.style.setProperty("--dock-h", dock.hidden ? "0px" : dock.offsetHeight + "px");
