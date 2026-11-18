@@ -633,8 +633,9 @@ dialog::backdrop { background:rgba(17,17,17,.55); }
 /* Wide screens: the page itself never scrolls. The header, page tabs and each page's search area stay put;
    only the laws (result list, the opened law) and the graph area scroll inside their own boxes. */
 @media (min-width:811px) {
-  html { height:100%; overflow:hidden; scroll-padding-top:0; }
-  body { height:100%; overflow:hidden; display:flex; flex-direction:column; }
+  /* clip, not hidden: a scrollIntoView (AI answer, article jump) must never shift the whole page up */
+  html { height:100%; overflow:clip; scroll-padding-top:0; }
+  body { height:100%; overflow:clip; display:flex; flex-direction:column; }
   .topbar, .page-nav { flex:none; }
   .main-wrap { flex:1 1 auto; min-height:0; width:100%; display:flex; flex-direction:column; overflow:hidden;
     padding-top:14px; padding-bottom:calc(var(--dock-h) + 14px); }
@@ -653,7 +654,23 @@ dialog::backdrop { background:rgba(17,17,17,.55); }
   .page-stick { top:0; }
   #pageGraph .graph-wrap { height:calc(100dvh - var(--top-h, 70px) - var(--sticky-h, 260px) - var(--dock-h) - 60px); min-height:320px; }
   #pageCompare .cmp-head { top:calc(var(--sticky-h) - var(--nav-h, 0px)); }
+  #pageSearch .sticky-top { margin-bottom:0 !important; box-shadow:none; border-bottom:0; }
+  /* the AI 질문 box fills the right panel: messages scroll, the question box stays at the bottom */
+  body.gw-open #reader { display:flex; flex-direction:column; overflow:hidden; }
+  body.gw-open #gwView { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+  body.gw-open .gw-chat { flex:1 1 auto; height:auto; min-height:0; }
+  /* folded top: search line, then data kinds + law filter + [펼치기] on one line; the notices are hidden */
+  .sticky-top.compact { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; column-gap:12px; }
+  .sticky-top.compact > #filterBar * { white-space:nowrap; }
+  .sticky-top.compact > * { grid-column:1 / -1; }
+  .sticky-top.compact > .ext-notice, .sticky-top.compact > .data-notice { display:none; }
+  .sticky-top.compact > #kinds { grid-column:1; margin:10px 0; flex-wrap:nowrap; }
+  .sticky-top.compact > #filterBar { grid-column:2; max-width:46vw; overflow-x:auto; }
+  .sticky-top.compact > #filterBar .law-filter, .sticky-top.compact > #filterBar .region-row { margin:0; flex-wrap:nowrap; }
+  .sticky-top.compact > #topFold { grid-column:3; }
+  #topFold { justify-self:end; white-space:nowrap; }
 }
+@media (max-width:810px) { #topFold { display:none; } }
 /* dark mode is gone in the brutal theme: undo the dark badge colours */
 :root .type-badge, :root[data-theme="dark"] .type-badge, :root:not([data-theme="light"]) .type-badge { background:var(--tb); color:#111111; border-color:#111111; }
 :root .g-node circle, :root[data-theme="dark"] .g-node circle, :root:not([data-theme="light"]) .g-node circle { fill:var(--tb); stroke:#111111; }
@@ -704,6 +721,7 @@ dialog::backdrop { background:rgba(17,17,17,.55); }
   <p class="data-notice" id="notice" role="status"></p>
   <nav class="kinds" id="kinds" aria-label="자료 종류"></nav>
   <div id="filterBar"></div>
+  <button type="button" class="ghost small" id="topFold" aria-expanded="false">▾ 알림·안내 펼치기</button>
   <div id="pickBar"></div>
   </div>
   <div class="workspace">
@@ -3505,7 +3523,24 @@ ctx.addEventListener("keydown", (e) => {
   // margin below it. (Without that the content jumped up, the area unstuck and grew again — the page shook.)
   // Content changing inside the frozen area while stuck keeps the same total height for the same reason.
   let full = 0;
+  const wide = window.matchMedia("(min-width:811px)");
+  // wide screens: the top never scrolls away (the page does not scroll), so it is folded by choice instead
+  const fold = $("#topFold");
+  const paintFold = () => {
+    let open = false; try { open = localStorage.getItem("jg.topOpen") === "1"; } catch (e) { /* private */ }
+    top.classList.toggle("compact", wide.matches && !open);
+    fold.textContent = open ? "▴ 알림·안내 접기" : "▾ 알림·안내 펼치기";
+    fold.setAttribute("aria-expanded", String(open));
+    measure();
+  };
+  fold.onclick = () => {
+    let open = false; try { open = localStorage.getItem("jg.topOpen") === "1"; localStorage.setItem("jg.topOpen", open ? "0" : "1"); } catch (e) { /* private */ }
+    paintFold();
+  };
+  wide.addEventListener("change", () => { if (wide.matches) { top.classList.remove("stuck"); top.style.marginBottom = ""; } paintFold(); });
+  paintFold();
   const setStuck = (on) => {
+    if (wide.matches) on = false;
     if (on === top.classList.contains("stuck")) return;
     if (on) {
       full = top.offsetHeight;
@@ -4503,7 +4538,17 @@ function gwAskNow(q, laws = []) {
   openGw(q || "");
   requestAnimationFrame(() => { gwLawsPaint(); const t = $("#gwQ"); if (q) { if (t) t.value = q; gwAsk(); } else if (t) t.focus(); });
 }
-const gwSearchLaws = () => [...new Set([...S.selected.map((m) => S.byMst.get(m)), ...[...S.picked.values()]].filter(Boolean).map((L) => L.title))];
+// The laws the AI answers from: the opened law, the law filter and ticked laws; else a short law result list (up to 8).
+// Only with none of these does the Mac mini choose the laws from the question.
+const gwSearchLaws = () => {
+  const out = [...S.selected.map((m) => S.byMst.get(m)), ...[...S.picked.values()]];
+  if (S.chosen && S.chosen.type === "law") out.unshift(S.byMst.get(S.chosen.id));
+  if (!out.filter(Boolean).length) {
+    const found = S.results.filter((it) => it.type === "law").map((it) => S.byMst.get(it.mst));
+    if (found.length && found.length <= 8) out.push(...found);
+  }
+  return [...new Set(out.filter(Boolean).map((L) => L.title))];
+};
 async function gwAskServer(turn, k, prior, q, rq, paint, picked = null, laws = [], graph = false) {
   const hist = prior.slice(-GW_KEEP);
   const text = hist.length ? `[이전 대화]\n${hist.map((x) => `질문: ${x.q}\n답: ${x.answer.slice(0, 900)}`).join("\n\n")}\n\n[이번 질문 — 위 대화에 이어서 답하세요]\n${q}` : q;
