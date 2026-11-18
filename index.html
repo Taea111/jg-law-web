@@ -527,6 +527,9 @@ dialog.box::backdrop {background:#171e32a8;}
 .catalog-controls input,.catalog-controls select,.box-body select {min-height:42px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface-100);min-width:0;}
 .catalog-list {list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:10px;}
 .catalog-list li + li {border-top:1px solid var(--line);}
+.cat-mode {display:flex;gap:6px;margin:0 0 10px;}
+.cat-mode button {min-height:40px;padding:6px 16px;font-weight:700;border:var(--bw,2px) solid var(--ink,#111);background:var(--surface-100);cursor:pointer;}
+.cat-mode button.on {background:var(--ink,#111);color:var(--surface-100,#fff);}
 .catalog-list label {display:flex;gap:12px;align-items:flex-start;padding:10px 14px;cursor:pointer;}
 .catalog-list label:hover {background:var(--surface-200);}
 .catalog-list input {margin-top:4px;width:18px;height:18px;flex:none;accent-color:var(--brand);}
@@ -1769,8 +1772,8 @@ async function loadIndex() {
   S.laws = S.index.laws.map(([mst, title, kind, ministry, effective, family, level, local, articles, shard, cases]) =>
     ({mst, title, kind, ministry, effective, family, level, local, articles, shard, cases}));
   S.byMst = new Map(S.laws.map((L) => [L.mst, L]));
-  S.filters = S.filters.filter((f) => S.byMst.has(f.mst));
-  S.selected = S.selected.filter((m) => S.byMst.has(m));
+  S.filters = S.filters.filter((f) => S.byMst.has(f.mst) || isOrdKey(f.mst));   // "o:<id>" = 자치법규 in the filter
+  S.selected = S.selected.filter((m) => S.byMst.has(m) || isOrdKey(m));
   S.loading = "";
   showDates();
   byCompactTitle = null; plainLawRe = null; renderHeadCounts();
@@ -1846,25 +1849,28 @@ function renderFilterBar() {
     ${S.filters.map((f) => `<span class="filter-chip ${S.selected.includes(f.mst) ? "chosen" : ""}">
       <button type="button" data-f="${f.mst}" aria-pressed="${S.selected.includes(f.mst)}" title="${esc(f.title)}">${esc(f.title)}</button>
       <button type="button" class="chip-x" data-x="${f.mst}" aria-label="필터에서 빼기: ${esc(f.title)}">×</button></span>`).join("")}
-    <button type="button" class="filter-add" id="fAdd">+ 법령 추가</button>
+    <button type="button" class="filter-add" id="fAdd">+ 법령 추가</button>${S.index && S.index.ordinances && S.index.ordinances.listed ? `<button type="button" class="filter-add" id="fAddOrd">+ 자치법규 추가</button>` : ""}
     ${S.selected.length ? `<span class="filter-on">🔒 고른 법령 ${S.selected.length}개 안에서만 찾습니다 (AI에게 묻기도 같음)</span>` : ""}
     ${S.selected.length && GW.ready ? `<button type="button" class="secondary small" id="filterGw">🤖 이 법령으로 AI에게 묻기</button>` : ""}</div>`;
   if ($("#filterGw")) $("#filterGw").onclick = () => gwAskNow(S.query, S.selected.map((m) => S.byMst.get(m)).filter(Boolean).map((L) => L.title));
   $("#fAll").onclick = () => { if (S.selected.length) { S.selected = []; afterFilter(); } };
   el.querySelectorAll("[data-f]").forEach((b) => b.onclick = () => toggleLaw(b.dataset.f));
   el.querySelectorAll("[data-x]").forEach((b) => b.onclick = () => removeFilter(b.dataset.x));
-  $("#fAdd").onclick = openCatalog;
+  $("#fAdd").onclick = () => openCatalog("law");
+  if ($("#fAddOrd")) $("#fAddOrd").onclick = () => openCatalog("ordin");
 }
 function toggleLaw(mst) {
   S.selected = S.selected.includes(mst) ? S.selected.filter((m) => m !== mst) : [...S.selected, mst];
   afterFilter();
 }
 function afterFilter() { if (S.selected.length) S.kind = "all"; S.notebook = null; renderKinds(); renderFilterBar(); renderPickBar(); runSearch(); }
-// Adding a law to the filter also limits the search to it (with the other chosen laws).
+// Adding a law (or a 자치법규, key "o:<id>") to the filter also limits the search to it (with the other chosen ones).
+const isOrdKey = (k) => String(k || "").startsWith("o:");
+const selLaws = () => S.selected.filter((m) => S.byMst.has(m));
 function addFilter(mst, run = true) {
-  const L = S.byMst.get(mst);
-  if (!L) return;
-  if (!S.filters.some((f) => f.mst === mst)) { S.filters = [...S.filters, {mst, title: L.title}]; store.set("filters", S.filters); }
+  const info = isOrdKey(mst) ? cmpInfo(mst) : S.byMst.get(mst);
+  if (!info) return;
+  if (!S.filters.some((f) => f.mst === mst)) { S.filters = [...S.filters, {mst, title: info.title}]; store.set("filters", S.filters); }
   if (!S.selected.includes(mst)) S.selected = [...S.selected, mst];
   if (run) afterFilter(); else renderFilterBar();
 }
@@ -1965,7 +1971,18 @@ async function runSearch() {
   if (S.selected.length) {
     // 법령 필터: search only inside the chosen laws (all of them listed; matches first).
     const items = [];
+    if (S.selected.some(isOrdKey) && !S.meta.ordin) { await metaOf("ordin"); if (stale()) return; }
     for (const mst of S.selected) {
+      if (isOrdKey(mst)) {
+        const id = mst.slice(2), r = S.metaById.ordin && S.metaById.ordin.get(id);
+        if (!r) continue;
+        const parts = qc ? await caseParts("ordin", id) : null;
+        if (stale()) return;
+        let hits = 0, snip = "";
+        for (const [h, t] of parts || []) if (has(qc)(h + t)) { if (!hits) snip = `${h} ${excerpt(t, q)}`; hits++; }
+        items.push(Object.assign(ordinItem(r), {hits, hitSnip: snip}));
+        continue;
+      }
       const L = S.byMst.get(mst), d = await lawData(mst);
       if (stale()) return;
       let hits = 0, snip = "";
@@ -2161,6 +2178,7 @@ function renderList() {
       <span class="result-top">${typeBadge(LABEL[it.kind])}${has ? "" : '<span class="type-label">본문 없음</span>'}</span>
       <strong>${highlight(r[1], S.query)}</strong>
       ${it.snip && it.snip !== r[2] && it.kind !== "ordin" ? `<span class="snippet">${highlight(it.snip, S.query)}</span>` : ""}
+      ${it.kind === "ordin" && it.hitSnip ? `<span class="snippet">${highlight(it.hitSnip, S.query)}</span>` : ""}
       ${it.kind === "ordin" ? `<span class="summary" data-sum="o${esc(it.id)}">${esc(S.sum.get("o" + it.id) || "")}</span>` : ""}
       <span class="source-label">${esc(it.kind === "ordin" ? it.snip : info)}</span></button>${favBtn(it.kind, it.id, i)}</div>`;
   }).join("") + (pool.length > S.shown ? `<button type="button" class="ghost small more" id="moreBtn">더 보기 (${n(pool.length - S.shown)})</button>` : "");
@@ -3231,7 +3249,7 @@ async function askSeed(chat, question) {
 }
 function filterNote() {
   if (!S.selected.length) return "";
-  return `\n\n법령 필터: 사용자가 아래 법령만 골랐습니다. 이 법령들 안에서 찾고 답하세요(도구도 이 법령들만 찾습니다). 고르지 않은 법령 이야기는 꼭 필요할 때만 〔외부〕로.\n${S.selected.map((m) => "- " + (S.byMst.get(m) || {}).title).join("\n")}`;
+  return `\n\n법령 필터: 사용자가 아래 법령만 골랐습니다. 이 법령들 안에서 찾고 답하세요(도구도 이 법령들만 찾습니다). 고르지 않은 법령 이야기는 꼭 필요할 때만 〔외부〕로.\n${S.selected.map((m) => "- " + ((isOrdKey(m) ? cmpInfo(m) : S.byMst.get(m)) || {}).title).join("\n")}`;
 }
 const ASK_RULES = (mode) => `${BASE_RULES()}\n\n${ASK_MODES[mode].rules}`;
 AI.asks = {};
@@ -3468,42 +3486,73 @@ function openDialog(title, html) {
 }
 $("#dlgClose").onclick = () => $("#dlg").close();
 // 법령 목록: browse every downloaded law and tick the ones for the filter.
-function openCatalog() {
+function openCatalog(startMode) {
   const kinds = new Map(), ministries = new Map();
   for (const L of S.laws) { kinds.set(L.kind, (kinds.get(L.kind) || 0) + 1); ministries.set(L.ministry, (ministries.get(L.ministry) || 0) + 1); }
   const opts = (m) => [...m].sort((a, b) => b[1] - a[1]).map(([k, c]) => `<option value="${esc(k)}">${esc(k || "(없음)")} (${n(c)})</option>`).join("");
+  const ordN = (S.index.ordinances && S.index.ordinances.listed) || 0;
+  let mode = startMode === "ordin" && ordN ? "ordin" : "law";
   const before = S.selected.join(",");
-  const body = openDialog("검색할 법령 고르기 (법령 필터)", `<p class="meta">받은 법령 ${n(S.laws.length)}개 · 체크한 법령 안에서만 찾습니다. 다 고른 뒤 아래 [확인]을 누르세요.</p>
-    <div class="catalog-controls"><input id="catQ" type="search" maxlength="60" placeholder="법령 이름 (예: 계약, 정보공개)" aria-label="법령 이름">
-      <select id="catKind" aria-label="법령 종류"><option value="">모든 종류</option>${opts(kinds)}</select>
-      <select id="catMin" aria-label="소관부처"><option value="">모든 부처</option>${opts(ministries)}</select></div>
+  const body = openDialog("검색할 법령 고르기 (법령 필터)", `<p class="meta">받은 법령 ${n(S.laws.length)}개${ordN ? ` · 자치법규 ${n(ordN)}개` : ""} · 체크한 법령·자치법규 안에서만 찾습니다. 다 고른 뒤 아래 [확인]을 누르세요.</p>
+    ${ordN ? `<div class="cat-mode" role="tablist" aria-label="고를 종류"><button type="button" role="tab" data-mode="law">법령</button><button type="button" role="tab" data-mode="ordin">자치법규 (조례·규칙)</button></div>` : ""}
+    <div class="catalog-controls" id="catCtl"></div>
     <p class="meta" id="catCount"></p><ul class="catalog-list" id="catList"></ul><button type="button" class="ghost small" id="catMore" hidden>더 보기</button>
     <div class="catalog-actions"><button type="button" class="primary" id="catOk">확인</button>
       <button type="button" class="ghost" id="catAll">필터 없이 전체 법령에서 찾기</button></div>`);
-  let limit = 100;
-  const draw = () => {
-    const qc = compact($("#catQ").value), k = $("#catKind").value, m = $("#catMin").value;
-    const rows = rankLaws($("#catQ").value, S.laws.filter((L) => (!qc || compact(L.title).includes(qc)) && (!k || L.kind === k) && (!m || L.ministry === m)));
-    const counted = () => { $("#catCount").textContent = `${n(rows.length)}개 · 고른 법령 ${S.selected.length}개`; $("#catOk").textContent = S.selected.length ? `확인 — 고른 ${S.selected.length}개 법령 안에서 찾기` : "확인 — 전체 법령에서 찾기"; };
-    counted();
-    $("#catList").innerHTML = rows.slice(0, limit).map((L) => `<li><label><input type="checkbox" data-m="${L.mst}" ${S.selected.includes(L.mst) ? "checked" : ""}>
-      <span><strong>${esc(L.title)}</strong><small>${esc([L.kind, L.ministry, L.effective && "시행 " + L.effective].filter(Boolean).join(" · "))}</small></span></label></li>`).join("");
-    $("#catList").querySelectorAll("input").forEach((c) => c.onchange = () => {
-      if (c.checked) addFilter(c.dataset.m, false); else { S.selected = S.selected.filter((m) => m !== c.dataset.m); renderFilterBar(); }
-      counted();
-    });
-    $("#catMore").hidden = rows.length <= limit;
-    $("#catMore").textContent = `더 보기 (${n(Math.min(limit, rows.length))}/${n(rows.length)})`;
+  let limit = 100, place = {sido: S.region.sido || "", sigungu: S.region.sigungu || ""};
+  const counted = (len) => { $("#catCount").textContent = `${n(len)}개 · 고른 것 ${S.selected.length}개`; $("#catOk").textContent = S.selected.length ? `확인 — 고른 ${S.selected.length}개 안에서 찾기` : "확인 — 전체 법령에서 찾기"; };
+  const tick = (len) => $("#catList").querySelectorAll("input").forEach((c) => c.onchange = () => {
+    if (c.checked) addFilter(c.dataset.m, false); else { S.selected = S.selected.filter((m) => m !== c.dataset.m); renderFilterBar(); }
+    counted(len);
+  });
+  const more = (len) => { $("#catMore").hidden = len <= limit; $("#catMore").textContent = `더 보기 (${n(Math.min(limit, len))}/${n(len)})`; };
+  const controls = () => {
+    body.querySelectorAll("[data-mode]").forEach((b) => { b.classList.toggle("on", b.dataset.mode === mode); b.setAttribute("aria-selected", b.dataset.mode === mode); });
+    if (mode === "law") {
+      $("#catCtl").innerHTML = `<input id="catQ" type="search" maxlength="60" placeholder="법령 이름 (예: 계약, 정보공개)" aria-label="법령 이름">
+        <select id="catKind" aria-label="법령 종류"><option value="">모든 종류</option>${opts(kinds)}</select>
+        <select id="catMin" aria-label="소관부처"><option value="">모든 부처</option>${opts(ministries)}</select>`;
+      $("#catKind").onchange = $("#catMin").onchange = () => { limit = 100; draw(); };
+    } else {
+      const rows = S.meta.ordin || [];
+      const sidos = [...new Set(rows.map((r) => r[3]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
+      const sgg = [...new Set(rows.filter((r) => r[3] === place.sido).map((r) => r[4]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
+      $("#catCtl").innerHTML = `<input id="catQ" type="search" maxlength="60" placeholder="자치법규 이름 (예: 주차장, 주민자치회)" aria-label="자치법규 이름">
+        <select id="catSido" aria-label="시·도"><option value="">모든 시·도</option>${sidos.map((x) => `<option ${x === place.sido ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>
+        <select id="catSgg" aria-label="시·군·구" ${place.sido ? "" : "disabled"}><option value="">${place.sido ? "시·도 전체(본청 포함)" : "시·군·구"}</option>${sgg.map((x) => `<option ${x === place.sigungu ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>`;
+      $("#catSido").onchange = (e) => { place = {sido: e.target.value, sigungu: ""}; limit = 100; const q = $("#catQ").value; controls(); $("#catQ").value = q; draw(); };
+      $("#catSgg").onchange = (e) => { place.sigungu = e.target.value; limit = 100; draw(); };
+    }
+    $("#catQ").oninput = () => { limit = 100; draw(); };
   };
-  $("#catQ").oninput = () => { limit = 100; draw(); };
-  $("#catKind").onchange = $("#catMin").onchange = () => { limit = 100; draw(); };
+  const draw = () => {
+    const qc = compact($("#catQ").value);
+    if (mode === "law") {
+      const k = $("#catKind").value, m = $("#catMin").value;
+      const rows = rankLaws($("#catQ").value, S.laws.filter((L) => (!qc || compact(L.title).includes(qc)) && (!k || L.kind === k) && (!m || L.ministry === m)));
+      $("#catList").innerHTML = rows.slice(0, limit).map((L) => `<li><label><input type="checkbox" data-m="${L.mst}" ${S.selected.includes(L.mst) ? "checked" : ""}>
+        <span><strong>${esc(L.title)}</strong><small>${esc([L.kind, L.ministry, L.effective && "시행 " + L.effective].filter(Boolean).join(" · "))}</small></span></label></li>`).join("");
+      counted(rows.length); tick(rows.length); more(rows.length); return;
+    }
+    const rows = (S.meta.ordin || []).filter((r) => (!qc || compact(`${r[1]} ${r[2] || ""}`).includes(qc)) && (!place.sido || r[3] === place.sido) && (!place.sigungu || r[4] === place.sigungu))
+      .sort((a, b) => homeRank(a) - homeRank(b) || a[1].localeCompare(b[1], "ko"));
+    $("#catList").innerHTML = rows.length ? rows.slice(0, limit).map((r) => `<li><label><input type="checkbox" data-m="o:${esc(r[0])}" ${S.selected.includes("o:" + r[0]) ? "checked" : ""}>
+      <span><strong>${esc(r[1])}</strong><small>${esc([r[5] || "자치법규", r[2], r[6] && "시행 " + r[6], !r[7] && "본문 없음"].filter(Boolean).join(" · "))}</small></span></label></li>`).join("")
+      : `<li class="meta" style="padding:12px 14px">${qc || place.sido ? "맞는 자치법규가 없습니다." : "이름을 넣거나 시·도를 고르세요."}</li>`;
+    counted(rows.length); tick(rows.length); more(rows.length);
+  };
+  const setMode = async (m) => {
+    mode = m; limit = 100;
+    if (m === "ordin" && !S.meta.ordin) { $("#catList").innerHTML = '<li class="meta" style="padding:12px 14px">자치법규 목록 불러오는 중…</li>'; await metaOf("ordin"); if (mode !== "ordin") return; }
+    controls(); draw(); $("#catQ").focus();
+  };
+  body.querySelectorAll("[data-mode]").forEach((b) => b.onclick = () => { if (b.dataset.mode !== mode) setMode(b.dataset.mode); });
   $("#catMore").onclick = () => { limit += 200; draw(); };
   $("#catOk").onclick = () => $("#dlg").close();
   $("#catAll").onclick = () => { S.selected = []; $("#dlg").close(); };
   // However the window closes (확인, 닫기, Esc), a changed choice is applied at once.
   $("#dlg").addEventListener("close", () => { if (S.selected.join(",") !== before) afterFilter(); }, {once: true});
-  draw();
-  $("#catQ").focus();
+  setMode(mode);
   return body;
 }
 $("#keysBtn").onclick = openKeys;
@@ -3763,7 +3812,7 @@ function lawFromBox(input) {
 // in 「 」 (인용), the laws whose articles name it (인용), and conflicts found on the 충돌·중복 tab.
 const G = {center: null, nodes: [], edges: [], view: {x: 0, y: 0, k: 1}, run: 0, picked: null, built: null};
 function openGraphPage() {
-  const want = (S.chosen && S.chosen.type === "law" && S.chosen.id) || S.selected[0] || [...S.picked.keys()][0] || null;
+  const want = (S.chosen && S.chosen.type === "law" && S.chosen.id) || selLaws()[0] || [...S.picked.keys()][0] || null;
   if (want && want !== G.center) { $("#gCenter").value = S.byMst.get(want).title; buildGraph(want); }
   else if (!G.center) { $("#gNote").textContent = "가운데에 둘 법령 이름을 넣고 [관계 보기]를 누르세요."; drawGraph(); }
 }
@@ -3999,7 +4048,7 @@ $("#confAddBtn").onclick = () => {
   $("#confAdd").value = ""; $("#confStatus").innerHTML = ""; addConfLaw(L.mst); renderConflictPage();
 };
 $("#confFromPick").onclick = () => {
-  const ms = [...S.selected, ...S.picked.keys()];
+  const ms = [...selLaws(), ...S.picked.keys()];
   if (!ms.length) { $("#confStatus").innerHTML = '<p class="meta">법령 검색 화면에서 법령 필터로 고르거나 ☐ 체크한 법령이 없습니다.</p>'; return; }
   ms.forEach(addConfLaw); renderConflictPage();
 };
