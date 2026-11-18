@@ -623,6 +623,7 @@ mark { background:#FFE98A; color:#111111; outline:2px solid #111111; }
 dialog { border:3px solid #111111; box-shadow:7px 7px 0 #111111; }
 dialog::backdrop { background:rgba(17,17,17,.55); }
 .page-foot { border-top:3px solid #111111; color:#111111; }
+#gwLogin.linked, .topbar #gwLogin.linked { background:#9BE7B4; color:#111111; border-color:#9BE7B4; cursor:default; box-shadow:none; }
 /* dark mode is gone in the brutal theme: undo the dark badge colours */
 :root .type-badge, :root[data-theme="dark"] .type-badge, :root:not([data-theme="light"]) .type-badge { background:var(--tb); color:#111111; border-color:#111111; }
 :root .g-node circle, :root[data-theme="dark"] .g-node circle, :root:not([data-theme="light"]) .g-node circle { fill:var(--tb); stroke:#111111; }
@@ -4217,9 +4218,14 @@ function gwFailed(why) {
   b.hidden = false; b.textContent = "⚠ AI 연결 안 됨"; b.title = why;
   console.warn("JG Gateway:", why);
 }
+// Opened in the JG시리즈 program window: its login is used, so show "linked" instead of log out (the window sets the flag).
+function gwLinked() { try { return sessionStorage.getItem("jg.linked") === "1"; } catch (e) { return false; } }
 function gwLoginLabel() {
   const b = $("#gwLogin"); let on = false; try { on = window.JG.isLoggedIn(); } catch (e) { /* not yet */ }
-  b.textContent = on ? "로그아웃" : "로그인"; b.title = on ? "JG 회원 로그아웃" : "JG 회원 로그인 (AI 질문)";
+  const linked = on && gwLinked();
+  b.textContent = linked ? "JG시리즈 연동중" : on ? "로그아웃" : "로그인";
+  b.title = linked ? "JG시리즈 로그인을 그대로 쓰고 있어요. 로그아웃은 JG시리즈에서 해요." : on ? "JG 회원 로그아웃" : "JG 회원 로그인 (AI 질문)";
+  b.classList.toggle("linked", linked);
   const note = $("#gwLoginNote");
   if (note) {
     note.hidden = on;
@@ -4238,6 +4244,7 @@ $("#gwLogin").onclick = async () => {
     return;
   }
   if (!GW.ready) return;
+  if (gwLinked() && window.JG.isLoggedIn()) return;          // the JG시리즈 window keeps the login
   const b = $("#gwLogin");
   try {
     if (window.JG.isLoggedIn()) await window.JG.logout();
