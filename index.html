@@ -671,6 +671,16 @@ dialog::backdrop { background:rgba(17,17,17,.55); }
   #topFold { justify-self:end; white-space:nowrap; }
 }
 @media (max-width:810px) { #topFold { display:none; } }
+/* 조문 골라 PDF */
+.pdf-bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0; }
+.pdf-bar input { flex:1 1 200px; min-width:0; border:3px solid #111111; padding:6px 10px; }
+.pdf-list { list-style:none; margin:0; padding:0; max-height:52vh; overflow-y:auto; border:3px solid #111111; background:#FFFFFF; }
+.pdf-list li { border-bottom:1px solid #111111; padding:6px 10px; }
+.pdf-list li[hidden] { display:none; }
+.pdf-list label { display:block; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pdf-list input { width:18px; height:18px; vertical-align:-3px; accent-color:#111111; }
+.pdf-opt { display:block; margin:10px 0; }
+.pdf-actions { display:flex; justify-content:flex-end; }
 /* dark mode is gone in the brutal theme: undo the dark badge colours */
 :root .type-badge, :root[data-theme="dark"] .type-badge, :root:not([data-theme="light"]) .type-badge { background:var(--tb); color:#111111; border-color:#111111; }
 :root .g-node circle, :root[data-theme="dark"] .g-node circle, :root:not([data-theme="light"]) .g-node circle { fill:var(--tb); stroke:#111111; }
@@ -2355,6 +2365,76 @@ function saveSelection(root, title) {
   saveText(`${name} (선택한 부분)`, dlHead(name, "", "", "선택한 부분") + t + "\n");
   return true;
 }
+/* ---------------------------------------------------------------- PDF: 조문을 골라 PDF로 받기
+   The chosen articles are laid out as an A4 document in a hidden frame and the print window opens: choosing
+   'PDF로 저장' (or Microsoft Print to PDF) saves it. The file name is the document title (law name). */
+async function openLawPdf(mst) {
+  const L = S.byMst.get(mst);
+  let d;
+  try { d = await lawData(mst); } catch (e) { flash("조문을 불러오지 못했습니다."); return; }
+  const arts = d.a.map(([h, t], i) => ({i, h: String(h || "").trim(), t: String(cleanArticle(h, t) || "").trim()}));
+  const body = openDialog(`조문 골라 PDF로 받기 · ${L.title}`, `<p class="meta">받을 조문을 고르세요. [PDF 만들기]를 누르면 인쇄 창이 열립니다.
+      프린터(대상)에서 <b>PDF로 저장</b> 또는 <b>Microsoft Print to PDF</b>를 고르고 저장하면 PDF 파일이 됩니다.</p>
+    <div class="pdf-bar"><button type="button" class="ghost small" id="pdfAll">보이는 조문 모두 선택</button>
+      <button type="button" class="ghost small" id="pdfNone">모두 해제</button>
+      <label class="vh" for="pdfFind">조문 찾기</label><input type="search" id="pdfFind" placeholder="조문 찾기 (예: 허가, 제10조)">
+      <span class="meta" id="pdfCount" aria-live="polite"></span></div>
+    <ol class="pdf-list" id="pdfList">${arts.map((a) => `<li data-i="${a.i}"><label><input type="checkbox" data-pdf="${a.i}" checked>
+      <b>${esc(a.h || "(제목 없음)")}</b> <span class="meta">${esc(a.t && a.t !== a.h ? a.t.slice(0, 70) : "")}</span></label></li>`).join("")}</ol>
+    <label class="pdf-opt"><input type="checkbox" id="pdfInfo" checked> 첫 장 위에 법령 정보(종류·소관·시행일·출처) 넣기</label>
+    <div class="pdf-actions"><button type="button" class="primary" id="pdfGo">📄 PDF 만들기</button></div>`);
+  const boxes = () => [...body.querySelectorAll("[data-pdf]")];
+  const count = () => {
+    const k = boxes().filter((b) => b.checked).length;
+    $("#pdfCount").textContent = `${n(k)} / ${n(arts.length)}개 선택`;
+    $("#pdfGo").disabled = !k;
+  };
+  $("#pdfAll").onclick = () => { boxes().forEach((b) => { if (!b.closest("li").hidden) b.checked = true; }); count(); };
+  $("#pdfNone").onclick = () => { boxes().forEach((b) => { b.checked = false; }); count(); };
+  $("#pdfFind").oninput = (e) => {
+    const f = compact(e.target.value);
+    body.querySelectorAll("#pdfList li").forEach((li) => { const a = arts[+li.dataset.i]; li.hidden = !!f && !compact(a.h + a.t).includes(f); });
+  };
+  body.onchange = count;
+  count();
+  $("#pdfGo").onclick = () => {
+    const pick = boxes().filter((b) => b.checked).map((b) => arts[+b.dataset.pdf]);
+    if (pick.length) printLaw(L, pick, $("#pdfInfo").checked, pick.length === arts.length);
+  };
+}
+function printLaw(L, arts, info, whole) {
+  const title = L.title + (whole ? "" : " (선택한 조문)");
+  const frame = Object.assign(document.createElement("iframe"), {title: "PDF"});
+  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+  document.body.append(frame);
+  const doc = frame.contentDocument;
+  const meta = [L.kind, L.ministry, "시행 " + (L.effective || "-")].filter(Boolean).join(" · ");
+  const basis = (S.index.source || S.index.built || "").slice(0, 10) || "-";
+  doc.open();
+  doc.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)}</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap">
+    <style>@page{size:A4;margin:18mm 16mm 18mm 16mm}
+      body{font-family:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:10.5pt;line-height:1.75;color:#000;margin:0;word-break:keep-all}
+      h1{font-size:17pt;margin:0 0 4pt;line-height:1.4} .info{font-size:9pt;color:#222;border-bottom:1.5pt solid #000;padding-bottom:6pt;margin:0 0 14pt}
+      .art{margin:0 0 9pt;break-inside:avoid-page} .art h3{font-size:10.5pt;margin:0 0 2pt} .art p{margin:0;white-space:pre-wrap}
+      .head-only h3{font-size:11.5pt;margin-top:8pt}</style></head><body>
+    <h1>${esc(title)}</h1>${info ? `<div class="info">${esc(meta)}<br>출처: 국가법령정보센터 · 자료 기준 ${esc(basis)} · 받은 날 ${dlDay()}<br>원문: ${esc(ORIGINAL.law(L.mst))}</div>` : ""}
+    ${arts.map((a) => (a.t && a.t !== a.h
+      ? `<div class="art"><h3>${esc(a.h)}</h3><p>${esc(a.t)}</p></div>`
+      : `<div class="art head-only"><h3>${esc(a.h || a.t)}</h3></div>`)).join("")}
+  </body></html>`);
+  doc.close();
+  const before = document.title;
+  const done = () => { document.title = before; setTimeout(() => frame.remove(), 1000); };
+  const go = () => {
+    document.title = title;                                // some print windows name the PDF after the page title
+    frame.contentWindow.addEventListener("afterprint", done, {once: true});
+    try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch (e) { done(); flash("인쇄 창을 열지 못했습니다."); }
+    setTimeout(() => { if (document.title === title) document.title = before; }, 120000);
+  };
+  const fonts = doc.fonts && doc.fonts.ready ? Promise.race([doc.fonts.ready, new Promise((r) => setTimeout(r, 2500))]) : Promise.resolve();
+  fonts.then(() => setTimeout(go, 150));
+}
 // [⬇ 전체 내려받기] [✂ 고른 부분 내려받기] — `whole` makes the full text (may be async).
 function dlButtons(prefix) {
   return `<button type="button" class="ghost small add-filter" id="${prefix}All" title="이 문서 전체를 텍스트 파일(.txt)로 받습니다">⬇ 내려받기</button>
@@ -2387,7 +2467,8 @@ function lawHtml(L) {
     ${S.split ? "" : `<button type="button" class="secondary small add-filter" id="selLaw" title="옆에 법령 비교를 띄우고 연계도의 가운데로 (결과를 두 번 눌러도 됨)">📌 선택 · 옆에 비교</button>`}
     <button type="button" class="ghost small add-filter" id="toGraph">🕸 연계도</button>
     ${favBtn("law", L.mst, null, true)}
-    ${dlButtons("dlLaw")}</div>
+    ${dlButtons("dlLaw")}
+    <button type="button" class="secondary small add-filter" id="pdfLaw" title="조문을 골라 PDF 파일로 받습니다 (국가법령정보센터의 조문 선택 PDF처럼)">📄 조문 골라 PDF</button></div>
     <nav class="reader-tabs" role="tablist" aria-label="문서 보기"><button role="tab" data-dt="content" aria-selected="${S.detailTab !== "source"}">내용</button>
     <button role="tab" data-dt="source" aria-selected="${S.detailTab === "source"}">출처와 날짜</button></nav>`;
   if (S.detailTab === "source") return `<div class="law-main">${head}<div class="reader-content">${sourceTable([
@@ -2417,6 +2498,7 @@ function bindLaw(L) {
   if ($("#selLaw")) $("#selLaw").onclick = () => selectLaw(L.mst);
   if ($("#toGraph")) $("#toGraph").onclick = () => { $("#gCenter").value = L.title; showPage("graph"); if (G.center !== L.mst) buildGraph(L.mst); };
   bindDlButtons("dlLaw", () => $("#reader .reader-content") || $("#reader"), L.title, () => lawText(L.mst));
+  if ($("#pdfLaw")) $("#pdfLaw").onclick = () => openLawPdf(L.mst);
   bindFavBtns($("#reader"));
   const find = $("#lawFind");
   if (!find) return;
